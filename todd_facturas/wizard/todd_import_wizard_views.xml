@@ -11,15 +11,15 @@
                     <field name="journal_id"/>
                     <field name="copiar_pdfs"/>
                 </group>
-                <group states="done">
+                <group invisible="state != 'done'">
                     <field name="total" readonly="1"/>
                     <field name="ok" readonly="1"/>
                     <field name="errores" readonly="1"/>
                     <field name="log" readonly="1" nolabel="1"/>
                 </group>
                 <footer>
-                    <button name="action_importar" string="Importar" type="object" class="btn-primary" states="draft"/>
-                    <button string="Cerrar" special="cancel" states="done"/>
+                    <button name="action_importar" string="Importar" type="object" class="btn-primary" invisible="state != 'draft'"/>
+                    <button string="Cerrar" special="cancel" invisible="state != 'done'"/>
                 </footer>
             </form>
         </field>
