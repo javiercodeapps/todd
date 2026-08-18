@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_todd_config_form" model="ir.ui.view">
+        <field name="name">todd.config.settings.form</field>
+        <field name="model">todd.config.settings</field>
+        <field name="arch" type="xml">
+            <form>
+                <group>
+                    <field name="pdf_source_dir"/>
+                    <field name="pdf_portal_dir"/>
+                </group>
+                <footer>
+                    <button name="action_guardar" string="Guardar" type="object" class="btn-primary"/>
+                    <button name="action_verificar" string="Verificar PDFs" type="object"/>
+                    <button string="Cerrar" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_todd_config" model="ir.actions.act_window">
+        <field name="name">Configuración Todd</field>
+        <field name="res_model">todd.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

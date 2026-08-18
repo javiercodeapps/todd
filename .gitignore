@@ -1,0 +1,8 @@
+facturas/
+facturas_portal/
+txts/
+*.pyc
+__pycache__/
+.vscode/
+.idea/
+.DS_Store

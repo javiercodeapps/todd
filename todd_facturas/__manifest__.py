@@ -1,0 +1,19 @@
+{
+    'name': "Todd Facturas",
+    'version': '19.0.1.0.0',
+    'depends': ['base', 'account', 'portal'],
+    'author': "Todd",
+    'category': 'Accounting',
+    'summary': 'Importación de facturas desde archivos TXT',
+    'data': [
+        'security/ir.model.access.csv',
+        'views/res_partner_views.xml',
+        'views/account_move_views.xml',
+        'views/todd_config_settings_views.xml',
+        'views/todd_menu.xml',
+        'wizard/todd_import_wizard_views.xml',
+        'templates/portal_templates.xml',
+    ],
+    'installable': True,
+    'application': True,
+}
