@@ -1,5 +1,6 @@
 {
     'name': "Todd Facturas",
+    'technical_name': 'todd_inv',
     'version': '19.0.1.0.0',
     'depends': ['base', 'account', 'portal'],
     'author': "Todd",
