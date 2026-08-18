@@ -6,6 +6,7 @@
     'category': 'Accounting',
     'summary': 'Importación de facturas desde archivos TXT',
     'data': [
+        'security/todd_security.xml',
         'security/ir.model.access.csv',
         'views/res_partner_views.xml',
         'views/account_move_views.xml',

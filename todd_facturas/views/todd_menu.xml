@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <menuitem id="menu_todd_root" name="Todd Facturas" sequence="100"/>
+    <menuitem id="menu_todd_root" name="Todd Facturas" sequence="100"
+              groups="todd_facturas.group_todd_manager"/>
 
     <menuitem id="menu_todd_facturas" name="Facturas" parent="menu_todd_root" sequence="10"/>
     <menuitem id="menu_todd_list" name="Listado" parent="menu_todd_facturas" action="account.action_move_out_invoice_type" sequence="10"/>
