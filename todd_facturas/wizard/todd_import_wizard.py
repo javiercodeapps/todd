@@ -101,14 +101,19 @@ class ToddImportWizard(models.TransientModel):
             # Verificar que el login no exista
             if self.env['res.users'].search([('login', '=', login)], limit=1):
                 login = f'{nro_socio}'
-            self.env['res.users'].create({
-                'name': nombre,
-                'login': login,
-                'password': password,
-                'partner_id': partner.id,
-                'groups_id': [(6, 0, [portal_group.id])]
-            })
-            log.append(f'{nombre}: usuario portal creado (login: {login})')
+                if self.env['res.users'].search([('login', '=', login)], limit=1):
+                    login = f'todd_{nro_socio}'
+            try:
+                self.env['res.users'].create({
+                    'name': nombre,
+                    'login': login,
+                    'password': password,
+                    'partner_id': partner.id,
+                    'groups_id': [(6, 0, [portal_group.id])]
+                })
+                log.append(f'{nombre}: usuario portal creado (login: {login})')
+            except Exception as e:
+                log.append(f'{nombre}: error creando usuario - {e}')
 
         existe = self.env['account.move'].search([('partner_id', '=', partner.id), ('todd_archivo_pdf', '=', archivo_pdf)], limit=1)
         if existe:
