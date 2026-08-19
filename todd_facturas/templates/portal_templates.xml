@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <template id="portal_my_invoices_custom" name="Portal Invoices Custom" inherit_id="account.portal_my_invoices">
+        <xpath expr="//thead//th[last()]" position="after">
+            <th>Servicio</th>
+            <th>Período</th>
+        </xpath>
+        <xpath expr="//tbody//t[@t-foreach='invoices']//td[last()]" position="after">
+            <td><t t-esc="invoice.todd_servicio"/></td>
+            <td><t t-esc="invoice.todd_periodo"/></td>
+        </xpath>
+    </template>
+
     <template id="portal_facturas" name="Mis Facturas">
         <t t-call="portal.portal_layout">
             <t t-set="breadcrumbs_searchbar" t-value="True"/>

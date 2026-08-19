@@ -38,3 +38,13 @@ class ToddPortal(http.Controller):
             ])
         except:
             return request.redirect('/my/facturas')
+
+    @http.route('/my/invoices', type='http', auth='user', website=True)
+    def portal_my_invoices(self, **kw):
+        partner = request.env.user.partner_id
+        invoices = request.env['account.move'].sudo().search([
+            ('partner_id', '=', partner.id),
+            ('move_type', '=', 'out_invoice'),
+            ('state', '=', 'posted'),
+        ])
+        return request.render('account.portal_my_invoices', {'invoices': invoices, 'page_name': 'invoices'})
