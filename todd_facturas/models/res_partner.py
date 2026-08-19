@@ -13,13 +13,11 @@ class ResPartner(models.Model):
         portal_group = self.env.ref('base.group_portal')
 
         # Verificar si ya tiene usuario portal
-        tiene_portal = self.env['res.users'].search([
-            ('partner_id', '=', self.id),
-            ('groups_id', 'in', [portal_group.id])
-        ], limit=1)
-        if tiene_portal:
-            return {'type': 'ir.actions.client', 'tag': 'display_notification',
-                    'params': {'title': 'Info', 'message': f'Ya tiene usuario portal: {tiene_portal.login}', 'type': 'info'}}
+        users = self.env['res.users'].search([('partner_id', '=', self.id)])
+        for user in users:
+            if portal_group.id in user.groups_id.ids:
+                return {'type': 'ir.actions.client', 'tag': 'display_notification',
+                        'params': {'title': 'Info', 'message': f'Ya tiene usuario portal: {user.login}', 'type': 'info'}}
 
         # Determinar login y contraseña
         login = self.todd_nro_usuario or f'todd_{self.todd_nro_socio}'
@@ -43,10 +41,13 @@ class ResPartner(models.Model):
         """Método para llamar desde otros módulos - crea usuario portal si no tiene"""
         portal_group = self.env.ref('base.group_portal')
         for partner in self:
-            tiene_portal = self.env['res.users'].search([
-                ('partner_id', '=', partner.id),
-                ('groups_id', 'in', [portal_group.id])
-            ], limit=1)
+            users = self.env['res.users'].search([('partner_id', '=', partner.id)])
+            tiene_portal = False
+            for user in users:
+                if portal_group.id in user.groups_id.ids:
+                    tiene_portal = True
+                    break
+
             if not tiene_portal:
                 login = partner.todd_nro_usuario or f'todd_{partner.todd_nro_socio}'
                 if self.env['res.users'].search([('login', '=', login)], limit=1):
