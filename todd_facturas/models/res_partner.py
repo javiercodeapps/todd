@@ -31,6 +31,7 @@ class ResPartner(models.Model):
             'login': login,
             'password': password,
             'partner_id': self.id,
+            'share': True,
         })
 
         # Asignar grupo portal via SQL
@@ -63,6 +64,7 @@ class ResPartner(models.Model):
                     'login': login,
                     'password': password,
                     'partner_id': partner.id,
+                    'share': True,
                 })
                 self.env.cr.execute(
                     "INSERT INTO res_groups_users_rel (gid, uid) VALUES (%s, %s) ON CONFLICT DO NOTHING",
