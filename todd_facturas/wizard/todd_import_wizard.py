@@ -106,13 +106,13 @@ class ToddImportWizard(models.TransientModel):
             if self.env['res.users'].search([('login', '=', login)], limit=1):
                 login = f'todd_{nro_socio}'
             try:
-                self.env['res.users'].with_context(no_reset_password=True).create({
+                user = self.env['res.users'].create({
                     'name': nombre,
                     'login': login,
                     'password': password,
                     'partner_id': partner.id,
-                    'groups_id': [(6, 0, [portal_group.id])]
                 })
+                user.write({'groups_id': [(4, portal_group.id)]})
                 log.append(f'{nombre}: usuario portal creado (login: {login})')
             except Exception as e:
                 log.append(f'{nombre}: error creando usuario - {e}')
