@@ -9,19 +9,19 @@ class ToddConfigSettings(models.TransientModel):
 
     pdf_source_dir = fields.Char(
         string='Directorio Origen PDFs',
-        default='/home/pepej/Desarrollo/todd/facturas'
+        default='/mnt/extra-addons/todd/facturas'
     )
     pdf_portal_dir = fields.Char(
         string='Directorio PDFs Web',
-        default='/home/pepej/Desarrollo/todd/facturas_web'
+        default='/mnt/extra-addons/todd/facturas_web'
     )
 
     @api.model
     def default_get(self, fields_list):
         res = super().default_get(fields_list)
         config = self.env['ir.config_parameter'].sudo()
-        res['pdf_source_dir'] = config.get_param('todd.pdf_source_dir', '/home/pepej/Desarrollo/todd/facturas')
-        res['pdf_portal_dir'] = config.get_param('todd.pdf_portal_dir', '/home/pepej/Desarrollo/todd/facturas_web')
+        res['pdf_source_dir'] = config.get_param('todd.pdf_source_dir', '/mnt/extra-addons/todd/facturas')
+        res['pdf_portal_dir'] = config.get_param('todd.pdf_portal_dir', '/mnt/extra-addons/todd/facturas_web')
         return res
 
     def action_guardar(self):
@@ -30,7 +30,10 @@ class ToddConfigSettings(models.TransientModel):
         config.set_param('todd.pdf_source_dir', self.pdf_source_dir)
         config.set_param('todd.pdf_portal_dir', self.pdf_portal_dir)
         if not os.path.exists(self.pdf_portal_dir):
-            os.makedirs(self.pdf_portal_dir)
+            try:
+                os.makedirs(self.pdf_portal_dir)
+            except OSError:
+                pass
 
     def action_verificar(self):
         self.ensure_one()

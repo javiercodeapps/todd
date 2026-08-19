@@ -39,11 +39,14 @@ class ToddImportWizard(models.TransientModel):
             raise UserError('TXT vacío')
 
         config = self.env['ir.config_parameter'].sudo()
-        source_dir = config.get_param('todd.pdf_source_dir', '/home/pepej/Desarrollo/todd/facturas')
-        portal_dir = config.get_param('todd.pdf_portal_dir', '/home/pepej/Desarrollo/todd/facturas_web')
+        source_dir = config.get_param('todd.pdf_source_dir', '/mnt/extra-addons/todd/facturas')
+        portal_dir = config.get_param('todd.pdf_portal_dir', '/mnt/extra-addons/todd/facturas_web')
 
         if self.copiar_pdfs and not os.path.exists(portal_dir):
-            os.makedirs(portal_dir)
+            try:
+                os.makedirs(portal_dir)
+            except OSError:
+                pass
 
         log = []
         total = ok = errores = 0
@@ -71,13 +74,12 @@ class ToddImportWizard(models.TransientModel):
         fecha_vto = datetime.strptime(c[6], '%d/%m/%Y').date()
         importe = float(c[7].replace(',', '.'))
         archivo_pdf = c[8]
-        estado_comp = c[11].strip()  # Pagado / Adeudado
+        estado_comp = c[11].strip()
         domicilio = c[12]
         nombre = c[13]
         servicio = c[14]
         dni = c[17] if len(c) > 17 else ''
 
-        # Partner
         partner = self.env['res.partner'].search([('todd_nro_socio', '=', nro_socio)], limit=1)
         if not partner:
             partner = self.env['res.partner'].create({
@@ -85,10 +87,8 @@ class ToddImportWizard(models.TransientModel):
                 'street': domicilio, 'vat': dni if dni and dni != '0' else False
             })
 
-        # Verificar duplicada
         existe = self.env['account.move'].search([('partner_id', '=', partner.id), ('todd_archivo_pdf', '=', archivo_pdf)], limit=1)
         if existe:
-            # Actualizar estado si cambió
             if 'Pagado' in estado_comp and existe.todd_estado_pago != 'pagado':
                 existe.action_registrar_pago()
                 log.append(f'{nombre}: actualizado a Pagado')
@@ -99,10 +99,7 @@ class ToddImportWizard(models.TransientModel):
                 log.append(f'{nombre}: ya existe sin cambios')
             return
 
-        # Número de factura: punto venta + número
         numero_factura = f'{pto_venta:04d}-{nro_fac:08d}'
-
-        # Crear factura
         servicio_nombre = {'E': 'Energía', 'A': 'Agua', 'T': 'Telefonía', 'I': 'Internet', 'S': 'Sepelio', 'N': 'Nichos'}.get(servicio, servicio)
 
         move = self.env['account.move'].create({
@@ -123,20 +120,18 @@ class ToddImportWizard(models.TransientModel):
             })]
         })
 
-        # Asignar número de factura como nombre
         move.write({'name': numero_factura})
-
-        # Confirmar factura automáticamente
         move.action_post()
 
-        # Registrar pago si está pagado
         if 'Pagado' in estado_comp:
             move.action_registrar_pago()
 
-        # Copiar PDF
-        if self.copiar_pdfs and archivo_pdf:
+        if self.copiar_pdfs and archivo_pdf and os.path.exists(source_dir):
             src = os.path.join(source_dir, archivo_pdf)
-            if os.path.exists(src):
-                shutil.copy2(src, portal_dir)
+            if os.path.exists(src) and os.path.exists(portal_dir):
+                try:
+                    shutil.copy2(src, portal_dir)
+                except Exception:
+                    pass
 
         log.append(f'{nombre}: factura {numero_factura} - {estado_comp}')
