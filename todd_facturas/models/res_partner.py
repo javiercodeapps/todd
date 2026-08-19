@@ -33,8 +33,11 @@ class ResPartner(models.Model):
             'partner_id': self.id,
         })
 
-        # Agregar al grupo portal desde el grupo
-        portal_group.write({'users': [(4, user.id)]})
+        # Asignar grupo portal via SQL
+        self.env.cr.execute(
+            "INSERT INTO res_groups_users_rel (gid, uid) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+            (portal_group.id, user.id)
+        )
 
         return {'type': 'ir.actions.client', 'tag': 'display_notification',
                 'params': {'title': 'Éxito', 'message': f'Usuario creado: {login}', 'type': 'success'}}
@@ -61,5 +64,8 @@ class ResPartner(models.Model):
                     'password': password,
                     'partner_id': partner.id,
                 })
-                portal_group.write({'users': [(4, user.id)]})
+                self.env.cr.execute(
+                    "INSERT INTO res_groups_users_rel (gid, uid) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                    (portal_group.id, user.id)
+                )
         return True
