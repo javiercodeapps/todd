@@ -71,6 +71,7 @@ class ToddImportWizard(models.TransientModel):
         fecha_vto = datetime.strptime(c[6], '%d/%m/%Y').date()
         importe = float(c[7].replace(',', '.'))
         archivo_pdf = c[8]
+        estado_comp = c[11].strip()  # Pagado / Adeudado
         domicilio = c[12]
         nombre = c[13]
         servicio = c[14]
@@ -87,7 +88,15 @@ class ToddImportWizard(models.TransientModel):
         # Verificar duplicada
         existe = self.env['account.move'].search([('partner_id', '=', partner.id), ('todd_archivo_pdf', '=', archivo_pdf)], limit=1)
         if existe:
-            log.append(f'{nombre}: ya existe')
+            # Actualizar estado si cambió
+            if 'Pagado' in estado_comp and existe.todd_estado_pago != 'pagado':
+                existe.action_registrar_pago()
+                log.append(f'{nombre}: actualizado a Pagado')
+            elif 'Adeudado' in estado_comp and existe.todd_estado_pago != 'adeudado':
+                existe.todd_estado_pago = 'adeudado'
+                log.append(f'{nombre}: actualizado a Adeudado')
+            else:
+                log.append(f'{nombre}: ya existe sin cambios')
             return
 
         # Número de factura: punto venta + número
@@ -120,10 +129,14 @@ class ToddImportWizard(models.TransientModel):
         # Confirmar factura automáticamente
         move.action_post()
 
+        # Registrar pago si está pagado
+        if 'Pagado' in estado_comp:
+            move.action_registrar_pago()
+
         # Copiar PDF
         if self.copiar_pdfs and archivo_pdf:
             src = os.path.join(source_dir, archivo_pdf)
             if os.path.exists(src):
                 shutil.copy2(src, portal_dir)
 
-        log.append(f'{nombre}: factura {numero_factura} confirmada')
+        log.append(f'{nombre}: factura {numero_factura} - {estado_comp}')

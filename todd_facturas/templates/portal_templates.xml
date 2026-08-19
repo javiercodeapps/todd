@@ -9,17 +9,28 @@
                     <thead>
                         <tr>
                             <th>Factura</th>
+                            <th>Servicio</th>
+                            <th>Período</th>
                             <th>Fecha</th>
+                            <th>Vencimiento</th>
                             <th>Total</th>
+                            <th>Estado</th>
                             <th>PDF</th>
                         </tr>
                     </thead>
                     <tbody>
                         <t t-foreach="facturas" t-as="f">
                             <tr>
-                                <td><t t-esc="f.invoice_origin or f.name"/></td>
+                                <td><t t-esc="f.name"/></td>
+                                <td><t t-esc="f.todd_servicio"/></td>
+                                <td><t t-esc="f.todd_periodo"/></td>
                                 <td><t t-esc="f.invoice_date" t-options="{'widget':'date'}"/></td>
+                                <td><t t-esc="f.invoice_date_due" t-options="{'widget':'date'}"/></td>
                                 <td><t t-esc="f.amount_total" t-options="{'widget':'monetary','display_currency':f.currency_id}"/></td>
+                                <td>
+                                    <span t-if="f.todd_estado_pago == 'pagado'" class="badge bg-success">Pagado</span>
+                                    <span t-else="" class="badge bg-danger">Adeudado</span>
+                                </td>
                                 <td>
                                     <t t-if="f.todd_pdf_disponible">
                                         <a t-attf-href="/my/factura/{{f.id}}/pdf" class="btn btn-sm btn-primary">PDF</a>
