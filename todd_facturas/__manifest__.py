@@ -5,6 +5,7 @@
     'author': "Todd",
     'category': 'Accounting',
     'summary': 'Importación de facturas desde archivos TXT',
+    'web_icon': 'todd_facturas,static/description/icon.png',
     'data': [
         'security/todd_security.xml',
         'security/ir.model.access.csv',
