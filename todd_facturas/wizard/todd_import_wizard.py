@@ -94,29 +94,8 @@ class ToddImportWizard(models.TransientModel):
                 'street': domicilio, 'vat': dni if dni and dni != '0' else False
             })
 
-        # Crear usuario portal si no tiene usuario con grupo portal
-        portal_group = self.env.ref('base.group_portal')
-        tiene_portal = self.env['res.users'].search([
-            ('partner_id', '=', partner.id),
-            ('groups_id', 'in', [portal_group.id])
-        ], limit=1)
-
-        if not tiene_portal:
-            password = dni if dni and dni != '0' else nro_usuario
-            login = nro_usuario
-            if self.env['res.users'].search([('login', '=', login)], limit=1):
-                login = f'todd_{nro_socio}'
-            try:
-                user = self.env['res.users'].create({
-                    'name': nombre,
-                    'login': login,
-                    'password': password,
-                    'partner_id': partner.id,
-                })
-                user.write({'groups_id': [(4, portal_group.id)]})
-                log.append(f'{nombre}: usuario portal creado (login: {login})')
-            except Exception as e:
-                log.append(f'{nombre}: error creando usuario - {e}')
+        # Crear usuario portal
+        partner.crear_usuario_portal_si_no_tiene()
 
         existe = self.env['account.move'].search([('partner_id', '=', partner.id), ('todd_archivo_pdf', '=', archivo_pdf)], limit=1)
         if existe:
