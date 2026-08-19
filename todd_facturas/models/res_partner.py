@@ -31,8 +31,10 @@ class ResPartner(models.Model):
             'login': login,
             'password': password,
             'partner_id': self.id,
-            'groups_id': [(6, 0, [portal_group.id])]
         })
+
+        # Agregar al grupo portal desde el grupo
+        portal_group.write({'users': [(4, user.id)]})
 
         return {'type': 'ir.actions.client', 'tag': 'display_notification',
                 'params': {'title': 'Éxito', 'message': f'Usuario creado: {login}', 'type': 'success'}}
@@ -53,11 +55,11 @@ class ResPartner(models.Model):
                 if self.env['res.users'].search([('login', '=', login)], limit=1):
                     login = f'todd_{partner.todd_nro_socio}'
                 password = partner.vat or partner.todd_nro_usuario or partner.todd_nro_socio
-                self.env['res.users'].create({
+                user = self.env['res.users'].create({
                     'name': partner.name,
                     'login': login,
                     'password': password,
                     'partner_id': partner.id,
-                    'groups_id': [(6, 0, [portal_group.id])]
                 })
+                portal_group.write({'users': [(4, user.id)]})
         return True
