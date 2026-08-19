@@ -64,9 +64,10 @@ class ToddImportWizard(models.TransientModel):
         return {
             'type': 'ir.actions.act_window',
             'res_model': 'account.move',
-            'view_mode': 'list,form',
+            'view_mode': 'list',
             'domain': [('move_type', '=', 'out_invoice'), ('todd_archivo_pdf', '!=', False)],
-            'target': 'current'
+            'target': 'current',
+            'context': {'create': False}
         }
 
     def _procesar(self, linea, log, source_dir, portal_dir):
