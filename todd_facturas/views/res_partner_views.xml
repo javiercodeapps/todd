@@ -11,6 +11,9 @@
                         <field name="todd_nro_socio"/>
                         <field name="todd_nro_usuario"/>
                     </group>
+                    <button name="action_crear_usuario_portal" string="Crear Usuario Portal"
+                            type="object" class="btn-primary"
+                            attrs="{'invisible': [('todd_nro_socio', '=', False)]}"/>
                 </page>
             </xpath>
         </field>
