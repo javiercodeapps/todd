@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <menuitem id="menu_todd_root" name="Todd Facturas" sequence="100"
-              groups="todd_facturas.group_todd_manager"/>
+    <menuitem id="menu_todd_root" name="Todd Facturas" sequence="100"/>
 
     <menuitem id="menu_todd_facturas" name="Facturas" parent="menu_todd_root" sequence="10"/>
     <menuitem id="menu_todd_list" name="Listado" parent="menu_todd_facturas" action="account.action_move_out_invoice_type" sequence="10"/>
 
     <menuitem id="menu_todd_import" name="Importación" parent="menu_todd_root" sequence="20"/>
     <menuitem id="menu_todd_import_txt" name="Importar TXT" parent="menu_todd_import" action="action_todd_import_wizard" sequence="10"/>
+    <menuitem id="menu_todd_control_txt" name="Control de Imports" parent="menu_todd_import" action="action_todd_txt_import" sequence="20"/>
 
     <menuitem id="menu_todd_config" name="Configuración" parent="menu_todd_root" sequence="40"/>
     <menuitem id="menu_todd_config_general" name="General" parent="menu_todd_config" action="action_todd_config" sequence="10"/>

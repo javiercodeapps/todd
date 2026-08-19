@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_todd_txt_import_form" model="ir.ui.view">
+        <field name="name">todd.txt.import.form</field>
+        <field name="model">todd.txt.import</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_procesar" string="Procesar" type="object"
+                            class="btn-primary" invisible="state != 'pending'"/>
+                    <button name="action_escanear_archivos" string="Escanear Directorio" type="object"
+                            class="btn-secondary"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group string="Archivo">
+                            <field name="filename"/>
+                            <field name="filepath"/>
+                            <field name="fecha_archivo"/>
+                        </group>
+                        <group string="Resultado">
+                            <field name="fecha_importacion"/>
+                            <field name="total_lineas"/>
+                            <field name="facturas_creadas"/>
+                            <field name="facturas_actualizadas"/>
+                            <field name="partners_creados"/>
+                            <field name="usuarios_creados"/>
+                            <field name="errores"/>
+                        </group>
+                    </group>
+                    <group string="Log" invisible="log == False">
+                        <field name="log" nolabel="1" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_todd_txt_import_list" model="ir.ui.view">
+        <field name="name">todd.txt.import.list</field>
+        <field name="model">todd.txt.import</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="filename"/>
+                <field name="fecha_archivo"/>
+                <field name="state"/>
+                <field name="facturas_creadas"/>
+                <field name="facturas_actualizadas"/>
+                <field name="errores"/>
+                <field name="fecha_importacion"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_todd_txt_import" model="ir.actions.act_window">
+        <field name="name">Control de Imports TXT</field>
+        <field name="res_model">todd.txt.import</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

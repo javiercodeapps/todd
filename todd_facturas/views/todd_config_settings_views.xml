@@ -8,10 +8,11 @@
                 <group>
                     <field name="pdf_source_dir"/>
                     <field name="pdf_portal_dir"/>
+                    <field name="txt_dir"/>
                 </group>
                 <footer>
                     <button name="action_guardar" string="Guardar" type="object" class="btn-primary"/>
-                    <button name="action_verificar" string="Verificar PDFs" type="object"/>
+                    <button name="action_escanear" string="Escanear TXTs" type="object"/>
                     <button string="Cerrar" special="cancel"/>
                 </footer>
             </form>

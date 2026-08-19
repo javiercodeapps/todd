@@ -22,7 +22,7 @@ class AccountMove(models.Model):
     @api.depends('todd_archivo_pdf')
     def _compute_todd_pdf_ruta(self):
         config = self.env['ir.config_parameter'].sudo()
-        portal_dir = config.get_param('todd.pdf_portal_dir', '/mnt/extra-addons/todd/facturas_web')
+        portal_dir = config.get_param('todd.pdf_portal_dir', '/var/logs/data/facturas_web')
         for record in self:
             record.todd_pdf_ruta = os.path.join(portal_dir, record.todd_archivo_pdf) if record.todd_archivo_pdf else ''
 
@@ -39,15 +39,10 @@ class AccountMove(models.Model):
         if self.todd_estado_pago == 'pagado':
             return True
 
-        # Buscar diario Banco
-        banco = self.env['account.journal'].search([
-            ('type', '=', 'bank'),
-        ], limit=1)
-
+        banco = self.env['account.journal'].search([('type', '=', 'bank')], limit=1)
         if not banco:
             raise UserError('No se encontró un diario de Banco')
 
-        # Buscar línea de método Manual Payment
         pml = self.env['account.payment.method.line'].search([
             ('journal_id', '=', banco.id),
             ('payment_method_id.name', 'ilike', '%manual%'),
