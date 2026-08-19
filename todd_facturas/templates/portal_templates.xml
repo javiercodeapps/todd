@@ -4,10 +4,16 @@
         <xpath expr="//thead//th[last()]" position="after">
             <th>Servicio</th>
             <th>Período</th>
+            <th>PDF</th>
         </xpath>
         <xpath expr="//tbody//t[@t-foreach='invoices']//td[last()]" position="after">
             <td><t t-if="invoice.todd_servicio == 'E'">Energía</t><t t-elif="invoice.todd_servicio == 'A'">Agua</t><t t-elif="invoice.todd_servicio == 'T'">Telefonía</t><t t-elif="invoice.todd_servicio == 'I'">Internet</t><t t-elif="invoice.todd_servicio == 'S'">Sepelio</t><t t-elif="invoice.todd_servicio == 'N'">Nichos</t></td>
             <td><t t-if="invoice.todd_periodo and len(invoice.todd_periodo) == 6"><t t-out="invoice.todd_periodo[4:6]"/>/<t t-out="invoice.todd_periodo[0:4]"/></t></td>
+            <td>
+                <t t-if="invoice.todd_pdf_disponible">
+                    <a t-attf-href="/my/factura/{{invoice.id}}/pdf" class="btn btn-sm btn-primary">PDF</a>
+                </t>
+            </td>
         </xpath>
     </template>
 
