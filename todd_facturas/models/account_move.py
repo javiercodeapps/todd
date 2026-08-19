@@ -39,9 +39,24 @@ class AccountMove(models.Model):
         if self.todd_estado_pago == 'pagado':
             return True
 
-        pml = self.env['account.payment.method.line'].search([
-            ('journal_id', '=', self.journal_id.id),
+        # Buscar diario Banco
+        banco = self.env['account.journal'].search([
+            ('type', '=', 'bank'),
         ], limit=1)
+
+        if not banco:
+            raise UserError('No se encontró un diario de Banco')
+
+        # Buscar línea de método Manual Payment
+        pml = self.env['account.payment.method.line'].search([
+            ('journal_id', '=', banco.id),
+            ('payment_method_id.name', 'ilike', '%manual%'),
+        ], limit=1)
+
+        if not pml:
+            pml = self.env['account.payment.method.line'].search([
+                ('journal_id', '=', banco.id),
+            ], limit=1)
 
         payment_vals = {
             'payment_type': 'inbound',
@@ -49,7 +64,7 @@ class AccountMove(models.Model):
             'partner_id': self.partner_id.id,
             'amount': self.amount_total,
             'date': self.invoice_date,
-            'journal_id': self.journal_id.id,
+            'journal_id': banco.id,
         }
         if pml:
             payment_vals['payment_method_line_id'] = pml.id
