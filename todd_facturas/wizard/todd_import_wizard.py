@@ -61,7 +61,13 @@ class ToddImportWizard(models.TransientModel):
                 log.append(f'Línea {i}: ERROR - {e}')
 
         self.write({'state': 'done', 'log': '\n'.join(log), 'total': total, 'ok': ok, 'errores': errores})
-        return {'type': 'ir.actions.act_window', 'res_model': 'todd.import.wizard', 'res_id': self.id, 'view_mode': 'form', 'target': 'new'}
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'account.move',
+            'view_mode': 'tree,form',
+            'domain': [('move_type', '=', 'out_invoice'), ('todd_archivo_pdf', '!=', False)],
+            'target': 'current'
+        }
 
     def _procesar(self, linea, log, source_dir, portal_dir):
         c = [x.strip() for x in linea.split(';')]
