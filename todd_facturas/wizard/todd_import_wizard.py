@@ -71,7 +71,6 @@ class ToddImportWizard(models.TransientModel):
         fecha_vto = datetime.strptime(c[6], '%d/%m/%Y').date()
         importe = float(c[7].replace(',', '.'))
         archivo_pdf = c[8]
-        estado = 'posted' if 'Pagado' in c[11] else 'draft'
         domicilio = c[12]
         nombre = c[13]
         servicio = c[14]
@@ -91,6 +90,9 @@ class ToddImportWizard(models.TransientModel):
             log.append(f'{nombre}: ya existe')
             return
 
+        # Número de factura: punto venta + número
+        numero_factura = f'{pto_venta:04d}-{nro_fac:08d}'
+
         # Crear factura
         servicio_nombre = {'E': 'Energía', 'A': 'Agua', 'T': 'Telefonía', 'I': 'Internet', 'S': 'Sepelio', 'N': 'Nichos'}.get(servicio, servicio)
 
@@ -104,7 +106,7 @@ class ToddImportWizard(models.TransientModel):
             'todd_nro_socio': nro_socio,
             'todd_servicio': servicio,
             'todd_periodo': periodo,
-            'ref': f'{pto_venta:04d}-{nro_fac:08d}',
+            'ref': numero_factura,
             'invoice_line_ids': [(0, 0, {
                 'name': f'{servicio_nombre} - {periodo}',
                 'quantity': 1,
@@ -112,10 +114,16 @@ class ToddImportWizard(models.TransientModel):
             })]
         })
 
+        # Asignar número de factura como nombre
+        move.write({'name': numero_factura})
+
+        # Confirmar factura automáticamente
+        move.action_post()
+
         # Copiar PDF
         if self.copiar_pdfs and archivo_pdf:
             src = os.path.join(source_dir, archivo_pdf)
             if os.path.exists(src):
                 shutil.copy2(src, portal_dir)
 
-        log.append(f'{nombre}: factura {move.name} creada')
+        log.append(f'{nombre}: factura {numero_factura} confirmada')
