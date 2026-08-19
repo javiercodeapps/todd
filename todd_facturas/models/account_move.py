@@ -71,7 +71,6 @@ class AccountMove(models.Model):
             'partner_id': self.partner_id.id,
             'amount': self.amount_total,
             'date': self.invoice_date,
-            'ref': f'Pago {self.name}',
             'journal_id': self.journal_id.id,
             'payment_method_id': payment_method.id if payment_method else False,
         })
