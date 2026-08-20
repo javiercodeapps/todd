@@ -17,7 +17,6 @@ class ToddTxtImport(models.Model):
     filepath = fields.Char(string='Ruta', readonly=True)
     state = fields.Selection([
         ('pending', 'Pendiente'),
-        ('queued', 'En Cola'),
         ('processing', 'Procesando'),
         ('done', 'Completado'),
         ('error', 'Error')
@@ -31,7 +30,6 @@ class ToddTxtImport(models.Model):
     usuarios_creados = fields.Integer(string='Usuarios Creados', readonly=True)
     errores = fields.Integer(string='Errores', readonly=True)
     log = fields.Text(string='Log', readonly=True)
-    job_uuid = fields.Char(string='Job UUID', readonly=True)
 
     @api.model
     def _get_txt_dir(self):
@@ -70,41 +68,30 @@ class ToddTxtImport(models.Model):
 
     @api.model
     def _procesar_pendientes(self):
-        """Escanear y encolar archivos pendientes"""
+        """Escanear y procesar archivos pendientes"""
         self.action_escanear_archivos()
-        pendientes = self.search([('state', '=', 'pending')], order='create_date asc')
-        for txt in pendientes:
-            txt.action_encolar()
+        pendientes = self.search([('state', '=', 'pending')], order='create_date asc', limit=1)
+        if pendientes:
+            pendientes.action_procesar()
 
-    def action_encolar(self):
-        """Encolar procesamiento de archivo"""
+    def action_procesar(self):
+        """Procesar un archivo TXT"""
         self.ensure_one()
-        if self.state != 'pending':
+        if self.state not in ('pending',):
             return
 
-        self.write({'state': 'queued'})
-
-        delayable = self.env['todd.txt.import'].with_delay()
-        delayable._procesar_archivo(self.id)
-
-    def _procesar_archivo(self, record_id):
-        """Método que ejecuta el job en cola"""
-        record = self.browse(record_id)
-        if not record or record.state != 'queued':
-            return
-
-        record.write({'state': 'processing', 'fecha_importacion': fields.Datetime.now()})
+        self.write({'state': 'processing', 'fecha_importacion': fields.Datetime.now()})
 
         try:
-            with open(record.filepath, 'r', encoding='latin-1') as f:
+            with open(self.filepath, 'r', encoding='latin-1') as f:
                 contenido = f.read()
         except Exception as e:
-            record.write({'state': 'error', 'log': f'Error leyendo archivo: {e}'})
+            self.write({'state': 'error', 'log': f'Error leyendo archivo: {e}'})
             return
 
         lineas = contenido.strip().split('\n')
         if len(lineas) < 2:
-            record.write({'state': 'error', 'log': 'Archivo vacío o sin datos'})
+            self.write({'state': 'error', 'log': 'Archivo vacío o sin datos'})
             return
 
         config = self.env['ir.config_parameter'].sudo()
@@ -127,7 +114,7 @@ class ToddTxtImport(models.Model):
 
         journal = self.env['account.journal'].search([('type', '=', 'sale')], limit=1)
         if not journal:
-            record.write({'state': 'error', 'log': 'No se encontró diario de ventas'})
+            self.write({'state': 'error', 'log': 'No se encontró diario de ventas'})
             return
 
         for i, linea in enumerate(lineas[1:], 2):
@@ -147,7 +134,7 @@ class ToddTxtImport(models.Model):
                 log.append(f'Línea {i}: ERROR - {e}')
                 _logger.error(f'Error procesando línea {i}: {e}')
 
-        record.write({
+        self.write({
             'state': 'done',
             'total_lineas': total,
             'facturas_creadas': creadas,
@@ -185,7 +172,6 @@ class ToddTxtImport(models.Model):
             })
             resultado['partner_nuevo'] = True
 
-        # Crear usuario portal si no tiene
         portal_group = self.env.ref('base.group_portal')
         users = self.env['res.users'].search([('partner_id', '=', partner.id)])
         tiene_portal = any(portal_group.id in u.groups_id.ids for u in users)
@@ -258,8 +244,3 @@ class ToddTxtImport(models.Model):
 
         resultado['nuevo'] = True
         return resultado
-
-    def action_procesar_manual(self):
-        """Procesar manualmente desde el botón"""
-        self.ensure_one()
-        self.action_encolar()

@@ -1,7 +1,7 @@
 {
     'name': "Todd Facturas",
     'version': '19.0.1.0.0',
-    'depends': ['base', 'account', 'portal', 'queue_job'],
+    'depends': ['base', 'account', 'portal'],
     'author': "Todd",
     'category': 'Accounting',
     'summary': 'Importación de facturas desde archivos TXT',
