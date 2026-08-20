@@ -48,8 +48,8 @@ class ResPartner(models.Model):
 
         # Solo grupo portal, quitar otros
         self.env.cr.execute(
-            "DELETE FROM res_groups_users_rel WHERE uid = %s AND gid NOT IN (SELECT id FROM res_groups WHERE name='Portal')",
-            (user.id,)
+            "DELETE FROM res_groups_users_rel WHERE uid = %s AND gid != %s",
+            (user.id, portal_group.id)
         )
         self.env.cr.execute(
             "INSERT INTO res_groups_users_rel (gid, uid) VALUES (%s, %s) ON CONFLICT DO NOTHING",
@@ -92,8 +92,8 @@ class ResPartner(models.Model):
 
                 # Solo grupo portal, quitar otros
                 self.env.cr.execute(
-                    "DELETE FROM res_groups_users_rel WHERE uid = %s AND gid NOT IN (SELECT id FROM res_groups WHERE name='Portal')",
-                    (user.id,)
+                    "DELETE FROM res_groups_users_rel WHERE uid = %s AND gid != %s",
+                    (user.id, portal_group.id)
                 )
                 self.env.cr.execute(
                     "INSERT INTO res_groups_users_rel (gid, uid) VALUES (%s, %s) ON CONFLICT DO NOTHING",
