@@ -8,7 +8,7 @@
                 <header>
                     <button name="action_procesar" string="Procesar" type="object"
                             class="btn-primary" invisible="state != 'pending'"/>
-                    <button name="action_escanear_archivos" string="Escanear Directorio" type="object"
+                    <button name="action_escanear_y_procesar" string="Escanear y Procesar" type="object"
                             class="btn-secondary"/>
                     <field name="state" widget="statusbar"/>
                 </header>
