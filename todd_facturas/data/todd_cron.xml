@@ -1,20 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="ir_cron_todd_import" model="ir.cron">
-        <field name="name">Todd: Procesar TXTs pendientes</field>
+        <field name="name">Todd: Escanear y procesar 1 TXT</field>
         <field name="model_id" ref="model_todd_txt_import"/>
         <field name="state">code</field>
         <field name="code">model._procesar_pendientes()</field>
-        <field name="interval_number">1</field>
-        <field name="interval_type">hours</field>
-        <field name="active">True</field>
-    </record>
-
-    <record id="ir_cron_todd_scan" model="ir.cron">
-        <field name="name">Todd: Escanear nuevos TXTs</field>
-        <field name="model_id" ref="model_todd_txt_import"/>
-        <field name="state">code</field>
-        <field name="code">model.action_escanear_archivos()</field>
         <field name="interval_number">1</field>
         <field name="interval_type">hours</field>
         <field name="active">True</field>
