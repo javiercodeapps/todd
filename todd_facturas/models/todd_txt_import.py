@@ -183,8 +183,9 @@ class ToddTxtImport(models.Model):
 
                 # Línea de factura via SQL
                 self.env.cr.execute(
-                    """INSERT INTO account_move_line (move_id, name, quantity, price_unit, account_id, debit, credit, date, company_id, currency_id)
-                       VALUES (%s,%s,1,%s,%s,%s,%s,CURRENT_DATE,1,1)""",
+                    """INSERT INTO account_move_line (move_id, name, quantity, price_unit, account_id, debit, credit, date, company_id, currency_id, display_type)
+                       VALUES (%s,%s,1,%s,%s,%s,%s,CURRENT_DATE,1,1,'product')
+                       RETURNING id""",
                     (move_id, f'{servicio_nombre} - {periodo}', importe, account.id, importe, 0)
                 )
 
