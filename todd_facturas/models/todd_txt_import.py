@@ -84,7 +84,6 @@ class ToddTxtImport(models.Model):
 
         self.write({'state': 'queued'})
 
-        from odoo.addons.queue_job.job import job
         delayable = self.env['todd.txt.import'].with_delay()
         delayable._procesar_archivo(self.id)
 
