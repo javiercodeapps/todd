@@ -117,6 +117,12 @@ class ToddTxtImport(models.Model):
         errores = self.errores or 0
 
         fin = min(offset + BATCH_SIZE, total)
+
+        # PASADA 1: Parsear líneas y crear partners
+        _logger.warning(f'TODD: {self.filename} - Pasada 1: procesando partners ({offset + 1}-{fin})')
+        partners_map = {}  # nro_socio -> partner_id
+        lineas_parseadas = []
+
         for i in range(offset + 1, fin):
             linea = lineas[i]
             try:
@@ -126,49 +132,65 @@ class ToddTxtImport(models.Model):
 
                 nro_socio = c[0]
                 nro_usuario = c[1]
-                periodo = c[2]
-                pto_venta = int(c[3])
-                nro_fac = int(c[4])
-                fecha_fac = datetime.strptime(c[5], '%d/%m/%Y').date()
-                fecha_vto = datetime.strptime(c[6], '%d/%m/%Y').date()
-                importe = float(c[7].replace(',', '.'))
-                archivo_pdf = c[8]
-                estado_comp = c[11].strip()
-                domicilio = c[12]
                 nombre = c[13]
-                servicio = c[14]
+                domicilio = c[12]
                 dni = c[17].strip() if len(c) > 17 else ''
 
+                # Partner via ORM
+                if nro_socio not in partners_map:
+                    partner = self.env['res.partner'].search([('todd_nro_socio', '=', nro_socio)], limit=1)
+                    if not partner:
+                        partner = self.env['res.partner'].create({
+                            'name': nombre, 'todd_nro_socio': nro_socio, 'todd_nro_usuario': nro_usuario,
+                            'street': domicilio, 'vat': dni if dni and dni != '0' else False
+                        })
+                        partners_nuevos += 1
+                    partner.crear_usuario_portal_si_no_tiene()
+                    partners_map[nro_socio] = partner.id
+
+                lineas_parseadas.append({
+                    'nro_socio': nro_socio,
+                    'periodo': c[2],
+                    'pto_venta': int(c[3]),
+                    'nro_fac': int(c[4]),
+                    'fecha_fac': datetime.strptime(c[5], '%d/%m/%Y').date(),
+                    'fecha_vto': datetime.strptime(c[6], '%d/%m/%Y').date(),
+                    'importe': float(c[7].replace(',', '.')),
+                    'archivo_pdf': c[8],
+                    'estado_comp': c[11].strip(),
+                    'servicio': c[14],
+                    'partner_id': partners_map[nro_socio],
+                    'line_num': i + 1,
+                })
+            except Exception as e:
+                errores += 1
+                log.append(f'Línea {i + 1}: ERROR pasada 1 - {e}')
+                _logger.error(f'TODD: Error pasada 1 línea {i + 1}: {e}')
+                self.env.cr.rollback()
+
+        _logger.warning(f'TODD: {self.filename} - Pasada 1 completa: {len(partners_map)} partners ({partners_nuevos} nuevos)')
+
+        # PASADA 2: Crear facturas via SQL
+        _logger.warning(f'TODD: {self.filename} - Pasada 2: creando facturas')
+        for lp in lineas_parseadas:
+            try:
                 # Verificar si ya existe
-                existe = self.env.cr.execute(
-                    "SELECT id FROM account_move WHERE partner_id IN (SELECT id FROM res_partner WHERE todd_nro_socio=%s) AND todd_archivo_pdf=%s LIMIT 1",
-                    (nro_socio, archivo_pdf)
+                self.env.cr.execute(
+                    "SELECT id FROM account_move WHERE partner_id=%s AND todd_archivo_pdf=%s LIMIT 1",
+                    (lp['partner_id'], lp['archivo_pdf'])
                 )
                 if self.env.cr.fetchone():
-                    if 'Pagado' in estado_comp:
+                    if 'Pagado' in lp['estado_comp']:
                         self.env.cr.execute(
-                            "UPDATE account_move SET todd_estado_pago='pagado' WHERE partner_id IN (SELECT id FROM res_partner WHERE todd_nro_socio=%s) AND todd_archivo_pdf=%s AND todd_estado_pago != 'pagado'",
-                            (nro_socio, archivo_pdf)
+                            "UPDATE account_move SET todd_estado_pago='pagado' WHERE partner_id=%s AND todd_archivo_pdf=%s AND todd_estado_pago != 'pagado'",
+                            (lp['partner_id'], lp['archivo_pdf'])
                         )
                         actualizadas += 1
                     continue
 
-                # Partner via ORM
-                partner = self.env['res.partner'].search([('todd_nro_socio', '=', nro_socio)], limit=1)
-                if not partner:
-                    partner = self.env['res.partner'].create({
-                        'name': nombre, 'todd_nro_socio': nro_socio, 'todd_nro_usuario': nro_usuario,
-                        'street': domicilio, 'vat': dni if dni and dni != '0' else False
-                    })
-                    partners_nuevos += 1
-
-                # Usuario portal via ORM
-                partner.crear_usuario_portal_si_no_tiene()
-
-                # Factura via SQL
-                numero = f'{pto_venta:04d}-{nro_fac:08d}'
-                estado_pago = 'pagado' if 'Pagado' in estado_comp else 'adeudado'
-                servicio_nombre = {'E': 'Energía', 'A': 'Agua', 'T': 'Telefonía', 'I': 'Internet', 'S': 'Sepelio', 'N': 'Nichos'}.get(servicio, servicio)
+                numero = f"{lp['pto_venta']:04d}-{lp['nro_fac']:08d}"
+                estado_pago = 'pagado' if 'Pagado' in lp['estado_comp'] else 'adeudado'
+                servicio_nombre = {'E': 'Energía', 'A': 'Agua', 'T': 'Telefonía', 'I': 'Internet', 'S': 'Sepelio', 'N': 'Nichos'}.get(lp['servicio'], lp['servicio'])
 
                 self.env.cr.execute(
                     """INSERT INTO account_move (move_type, partner_id, invoice_date, invoice_date_due, journal_id,
@@ -176,22 +198,22 @@ class ToddTxtImport(models.Model):
                        todd_estado_pago, state, company_id, currency_id, payment_state, auto_post, date)
                        VALUES ('out_invoice',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'posted',1,1,'not_paid','never',%s)
                        RETURNING id""",
-                    (partner.id, fecha_fac, fecha_vto, journal.id, archivo_pdf, nro_socio,
-                     servicio, periodo, numero, numero, estado_pago, fecha_fac)
+                    (lp['partner_id'], lp['fecha_fac'], lp['fecha_vto'], self.env.company.id,
+                     lp['archivo_pdf'], lp['nro_socio'], lp['servicio'], lp['periodo'],
+                     numero, numero, estado_pago, lp['fecha_fac'])
                 )
                 move_id = self.env.cr.fetchone()[0]
 
-                # Línea de factura via SQL
                 self.env.cr.execute(
                     """INSERT INTO account_move_line (move_id, name, quantity, price_unit, account_id, debit, credit, date, company_id, currency_id, display_type)
-                       VALUES (%s,%s,1,%s,%s,%s,%s,CURRENT_DATE,1,1,'product')
-                       RETURNING id""",
-                    (move_id, f'{servicio_nombre} - {periodo}', importe, account.id, importe, 0)
+                       VALUES (%s,%s,1,%s,%s,%s,%s,CURRENT_DATE,%s,1,'product')""",
+                    (move_id, f'{servicio_nombre} - {lp["periodo"]}', lp['importe'], account.id,
+                     lp['importe'], 0, self.env.company.id)
                 )
 
                 # Copiar PDF
                 if os.path.exists(source_dir) and os.path.exists(portal_dir):
-                    src = os.path.join(source_dir, archivo_pdf)
+                    src = os.path.join(source_dir, lp['archivo_pdf'])
                     if os.path.exists(src):
                         try: shutil.copy2(src, portal_dir)
                         except: pass
@@ -199,8 +221,8 @@ class ToddTxtImport(models.Model):
                 creadas += 1
             except Exception as e:
                 errores += 1
-                log.append(f'Línea {i + 1}: ERROR - {e}')
-                _logger.error(f'TODD: Error línea {i + 1}: {e}')
+                log.append(f'Línea {lp["line_num"]}: ERROR pasada 2 - {e}')
+                _logger.error(f'TODD: Error pasada 2 línea {lp["line_num"]}: {e}')
                 self.env.cr.rollback()
 
         _logger.warning(f'TODD: {self.filename} - Batch {offset + 1}-{fin}/{total} ({creadas} creadas, {actualizadas} actualizadas)')
