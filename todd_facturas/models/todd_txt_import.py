@@ -78,7 +78,7 @@ class ToddTxtImport(models.Model):
         if self.state not in ('pending',):
             return
 
-        _logger.warning(f'TODD: Iniciando carga SQL de {self.filename}')
+        _logger.warning(f'TODD: Iniciando carga de {self.filename}')
         self.write({'state': 'processing', 'fecha_importacion': fields.Datetime.now()})
 
         try:
@@ -104,8 +104,9 @@ class ToddTxtImport(models.Model):
             except: pass
 
         journal = self.env['account.journal'].search([('type', '=', 'sale')], limit=1)
-        if not journal:
-            self.write({'state': 'error', 'log': 'No hay diario de ventas'})
+        account = self.env['account.account'].search([('account_type', '=', 'income')], limit=1)
+        if not journal or not account:
+            self.write({'state': 'error', 'log': 'No hay diario o cuenta de ingresos'})
             return
 
         log = []
@@ -116,10 +117,6 @@ class ToddTxtImport(models.Model):
         errores = self.errores or 0
 
         fin = min(offset + BATCH_SIZE, total)
-        batch_partners = {}
-        batch_users = {}
-        batch_moves = []
-
         for i in range(offset + 1, fin):
             linea = lineas[i]
             try:
@@ -156,65 +153,40 @@ class ToddTxtImport(models.Model):
                         actualizadas += 1
                     continue
 
-                # Partners
-                if nro_socio not in batch_partners:
-                    self.env.cr.execute("SELECT id FROM res_partner WHERE todd_nro_socio=%s", (nro_socio,))
-                    row = self.env.cr.fetchone()
-                    if row:
-                        batch_partners[nro_socio] = row[0]
-                    else:
-                        vat = dni if dni and dni != '0' else False
-                        self.env.cr.execute(
-                            "INSERT INTO res_partner (name, todd_nro_socio, todd_nro_usuario, street, vat, is_company, customer_rank, autopost_bills) VALUES (%s,%s,%s,%s,%s,false,1,'never') RETURNING id",
-                            (nombre, nro_socio, nro_usuario, domicilio, vat)
-                        )
-                        batch_partners[nro_socio] = self.env.cr.fetchone()[0]
-                        partners_nuevos += 1
+                # Partner via ORM
+                partner = self.env['res.partner'].search([('todd_nro_socio', '=', nro_socio)], limit=1)
+                if not partner:
+                    partner = self.env['res.partner'].create({
+                        'name': nombre, 'todd_nro_socio': nro_socio, 'todd_nro_usuario': nro_usuario,
+                        'street': domicilio, 'vat': dni if dni and dni != '0' else False
+                    })
+                    partners_nuevos += 1
 
-                partner_id = batch_partners[nro_socio]
+                # Usuario portal via ORM
+                partner.crear_usuario_portal_si_no_tiene()
 
-                # Usuarios portal
-                if nro_socio not in batch_users:
-                    login = dni if dni and dni != '0' else nro_socio
-                    self.env.cr.execute("SELECT id FROM res_users WHERE login=%s", (login,))
-                    if not self.env.cr.fetchone():
-                        self.env.cr.execute(
-                            "INSERT INTO res_users (login, password, partner_id, share, company_id) VALUES (%s,%s,%s,true,1) RETURNING id",
-                            (login, login, partner_id)
-                        )
-                        uid = self.env.cr.fetchone()[0]
-                        portal_gid = self.env.ref('base.group_portal').id
-                        self.env.cr.execute(
-                            "INSERT INTO res_groups_users_rel (gid, uid) VALUES (%s,%s) ON CONFLICT DO NOTHING",
-                            (portal_gid, uid)
-                        )
-                        batch_users[nro_socio] = True
-                        usuarios_nuevos += 1
-
-                # Factura
+                # Factura via SQL
                 numero = f'{pto_venta:04d}-{nro_fac:08d}'
-                servicio_nombre = {'E': 'Energía', 'A': 'Agua', 'T': 'Telefonía', 'I': 'Internet', 'S': 'Sepelio', 'N': 'Nichos'}.get(servicio, servicio)
                 estado_pago = 'pagado' if 'Pagado' in estado_comp else 'adeudado'
+                servicio_nombre = {'E': 'Energía', 'A': 'Agua', 'T': 'Telefonía', 'I': 'Internet', 'S': 'Sepelio', 'N': 'Nichos'}.get(servicio, servicio)
 
                 self.env.cr.execute(
                     """INSERT INTO account_move (move_type, partner_id, invoice_date, invoice_date_due, journal_id,
                        todd_archivo_pdf, todd_nro_socio, todd_servicio, todd_periodo, ref, name,
-                       todd_estado_pago, state, company_id, currency_id, payment_state, invoice_origin)
-                       VALUES ('out_invoice',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'posted',1,1,'not_paid','')
+                       todd_estado_pago, state, company_id, currency_id, payment_state)
+                       VALUES ('out_invoice',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'posted',1,1,'not_paid')
                        RETURNING id""",
-                    (partner_id, fecha_fac, fecha_vto, journal.id, archivo_pdf, nro_socio,
+                    (partner.id, fecha_fac, fecha_vto, journal.id, archivo_pdf, nro_socio,
                      servicio, periodo, numero, numero, estado_pago)
                 )
                 move_id = self.env.cr.fetchone()[0]
 
-                # Línea de factura
-                account = self.env['account.account'].search([('account_type', '=', 'income')], limit=1)
-                if account:
-                    self.env.cr.execute(
-                        """INSERT INTO account_move_line (move_id, name, quantity, price_unit, account_id, debit, credit, date, company_id, currency_id)
-                           VALUES (%s,%s,1,%s,%s,%s,%s,CURRENT_DATE,1,1)""",
-                        (move_id, f'{servicio_nombre} - {periodo}', importe, account.id, importe, 0)
-                    )
+                # Línea de factura via SQL
+                self.env.cr.execute(
+                    """INSERT INTO account_move_line (move_id, name, quantity, price_unit, account_id, debit, credit, date, company_id, currency_id)
+                       VALUES (%s,%s,1,%s,%s,%s,%s,CURRENT_DATE,1,1)""",
+                    (move_id, f'{servicio_nombre} - {periodo}', importe, account.id, importe, 0)
+                )
 
                 # Copiar PDF
                 if os.path.exists(source_dir) and os.path.exists(portal_dir):
