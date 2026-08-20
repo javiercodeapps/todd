@@ -190,26 +190,7 @@ class ToddTxtImport(models.Model):
             })
             resultado['partner_nuevo'] = True
 
-        portal_group = self.env.ref('base.group_portal')
-        users = self.env['res.users'].search([('partner_id', '=', partner.id)])
-        tiene_portal = any(portal_group.id in u.groups_id.ids for u in users)
-
-        if not tiene_portal:
-            login = partner.vat or partner.todd_nro_socio
-            if login and not self.env['res.users'].search([('login', '=', login)], limit=1):
-                password = login
-                user = self.env['res.users'].create({
-                    'name': partner.name,
-                    'login': login,
-                    'password': password,
-                    'partner_id': partner.id,
-                    'share': True,
-                })
-                self.env.cr.execute(
-                    "INSERT INTO res_groups_users_rel (gid, uid) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-                    (portal_group.id, user.id)
-                )
-                resultado['usuario_creado'] = True
+        partner.crear_usuario_portal_si_no_tiene()
 
         existe = self.env['account.move'].search([
             ('partner_id', '=', partner.id),
