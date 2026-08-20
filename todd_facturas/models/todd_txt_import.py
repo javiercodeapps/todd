@@ -165,7 +165,7 @@ class ToddTxtImport(models.Model):
                     else:
                         vat = dni if dni and dni != '0' else False
                         self.env.cr.execute(
-                            "INSERT INTO res_partner (name, todd_nro_socio, todd_nro_usuario, street, vat, is_company, customer_rank) VALUES (%s,%s,%s,%s,%s,false,1) RETURNING id",
+                            "INSERT INTO res_partner (name, todd_nro_socio, todd_nro_usuario, street, vat, is_company, customer_rank, autopost_bills) VALUES (%s,%s,%s,%s,%s,false,1,'never') RETURNING id",
                             (nombre, nro_socio, nro_usuario, domicilio, vat)
                         )
                         batch_partners[nro_socio] = self.env.cr.fetchone()[0]
