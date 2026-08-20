@@ -179,7 +179,7 @@ class ToddTxtImport(models.Model):
                     self.env.cr.execute("SELECT id FROM res_users WHERE login=%s", (login,))
                     if not self.env.cr.fetchone():
                         self.env.cr.execute(
-                            "INSERT INTO res_users (login, password, partner_id, share) VALUES (%s,%s,%s,true) RETURNING id",
+                            "INSERT INTO res_users (login, password, partner_id, share, company_id) VALUES (%s,%s,%s,true,1) RETURNING id",
                             (login, login, partner_id)
                         )
                         uid = self.env.cr.fetchone()[0]
