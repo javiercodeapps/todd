@@ -3,9 +3,10 @@ import shutil
 import logging
 from datetime import datetime
 from odoo import models, fields, api
-from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
+
+BATCH_SIZE = 5000
 
 
 class ToddTxtImport(models.Model):
@@ -24,6 +25,7 @@ class ToddTxtImport(models.Model):
     fecha_archivo = fields.Datetime(string='Fecha Archivo', readonly=True)
     fecha_importacion = fields.Datetime(string='Fecha Importación', readonly=True)
     total_lineas = fields.Integer(string='Total Líneas', readonly=True)
+    lineas_procesadas = fields.Integer(string='Líneas Procesadas', readonly=True)
     facturas_creadas = fields.Integer(string='Facturas Creadas', readonly=True)
     facturas_actualizadas = fields.Integer(string='Facturas Actualizadas', readonly=True)
     partners_creados = fields.Integer(string='Partners Creados', readonly=True)
@@ -85,7 +87,7 @@ class ToddTxtImport(models.Model):
             pendientes.action_procesar()
 
     def action_procesar(self):
-        """Procesar un archivo TXT"""
+        """Procesar un archivo TXT en lotes de BATCH_SIZE"""
         self.ensure_one()
         if self.state not in ('pending',):
             return
@@ -95,18 +97,19 @@ class ToddTxtImport(models.Model):
 
         try:
             with open(self.filepath, 'r', encoding='latin-1') as f:
-                contenido = f.read()
+                lineas = f.readlines()
         except Exception as e:
             _logger.error(f'TODD: Error leyendo {self.filename}: {e}')
             self.write({'state': 'error', 'log': f'Error leyendo archivo: {e}'})
             return
 
-        lineas = contenido.strip().split('\n')
-        if len(lineas) < 2:
+        total_lineas = len(lineas)
+        offset = self.lineas_procesadas or 0
+        if total_lineas < 2:
             self.write({'state': 'error', 'log': 'Archivo vacío o sin datos'})
             return
 
-        _logger.warning(f'TODD: {self.filename} tiene {len(lineas) - 1} líneas a procesar')
+        _logger.warning(f'TODD: {self.filename} - Total: {total_lineas}, procesando desde línea {offset + 1}')
 
         config = self.env['ir.config_parameter'].sudo()
         source_dir = config.get_param('todd.pdf_source_dir', '/var/logs/data/facturas')
@@ -119,20 +122,20 @@ class ToddTxtImport(models.Model):
                 pass
 
         log = []
-        total = 0
-        creadas = 0
-        actualizadas = 0
-        partners_nuevos = 0
-        usuarios_nuevos = 0
-        errores = 0
+        creadas = self.facturas_creadas or 0
+        actualizadas = self.facturas_actualizadas or 0
+        partners_nuevos = self.partners_creados or 0
+        usuarios_nuevos = self.usuarios_creados or 0
+        errores = self.errores or 0
 
         journal = self.env['account.journal'].search([('type', '=', 'sale')], limit=1)
         if not journal:
             self.write({'state': 'error', 'log': 'No se encontró diario de ventas'})
             return
 
-        for i, linea in enumerate(lineas[1:], 2):
-            total += 1
+        fin = min(offset + BATCH_SIZE, total_lineas)
+        for i in range(offset + 1, fin):
+            linea = lineas[i]
             try:
                 resultado = self._procesar_linea(linea, journal, source_dir, portal_dir)
                 if resultado.get('nuevo'):
@@ -143,27 +146,31 @@ class ToddTxtImport(models.Model):
                     partners_nuevos += 1
                 if resultado.get('usuario_creado'):
                     usuarios_nuevos += 1
-                if total % 500 == 0:
-                    _logger.warning(f'TODD: {self.filename} - Procesadas {total} líneas ({creadas} creadas, {actualizadas} actualizadas, {errores} errores)')
-                    self.env.cr.commit()
             except Exception as e:
                 errores += 1
-                log.append(f'Línea {i}: ERROR - {e}')
-                _logger.error(f'TODD: Error línea {i} en {self.filename}: {e}')
+                log.append(f'Línea {i + 1}: ERROR - {e}')
+                _logger.error(f'TODD: Error línea {i + 1} en {self.filename}: {e}')
 
-        _logger.warning(f'TODD: Finalizado {self.filename} - Total: {total}, Creadas: {creadas}, Actualizadas: {actualizadas}, Partners: {partners_nuevos}, Usuarios: {usuarios_nuevos}, Errores: {errores}')
+        procesadas = fin
+        _logger.warning(f'TODD: {self.filename} - Procesadas {procesadas}/{total_lineas} ({creadas} creadas, {actualizadas} actualizadas, {errores} errores)')
 
         self.write({
-            'state': 'done',
-            'total_lineas': total,
+            'total_lineas': total_lineas,
+            'lineas_procesadas': procesadas,
             'facturas_creadas': creadas,
             'facturas_actualizadas': actualizadas,
             'partners_creados': partners_nuevos,
             'usuarios_creados': usuarios_nuevos,
             'errores': errores,
-            'log': '\n'.join(log)
+            'log': '\n'.join(log[-50:])
         })
         self.env.cr.commit()
+
+        if procesadas >= total_lineas:
+            self.write({'state': 'done'})
+            _logger.warning(f'TODD: Finalizado {self.filename} - Total: {total_lineas}, Creadas: {creadas}, Actualizadas: {actualizadas}, Partners: {partners_nuevos}, Usuarios: {usuarios_nuevos}, Errores: {errores}')
+        else:
+            _logger.warning(f'TODD: {self.filename} pendiente - quedan {total_lineas - procesadas} líneas')
 
     def _procesar_linea(self, linea, journal, source_dir, portal_dir):
         c = [x.strip() for x in linea.split(';')]
