@@ -6,8 +6,8 @@
         <field name="arch" type="xml">
             <form>
                 <header>
-                    <button name="action_procesar_manual" string="Procesar" type="object"
-                            class="btn-primary" invisible="state not in ('pending', 'queued')"/>
+                    <button name="action_procesar" string="Procesar" type="object"
+                            class="btn-primary" invisible="state != 'pending'"/>
                     <button name="action_escanear_archivos" string="Escanear Directorio" type="object"
                             class="btn-secondary"/>
                     <field name="state" widget="statusbar"/>
