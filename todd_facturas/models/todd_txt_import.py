@@ -40,7 +40,7 @@ class ToddTxtImport(models.Model):
     def action_escanear_archivos(self):
         """Escanear directorio de TXTs y crear registros pendientes"""
         txt_dir = self._get_txt_dir()
-        _logger.info(f'TODD: Escaneando directorio {txt_dir}')
+        _logger.warning(f'TODD: Escaneando directorio {txt_dir}')
         if not os.path.exists(txt_dir):
             _logger.warning(f'TODD: Directorio TXT no existe: {txt_dir}')
             return 0
@@ -64,9 +64,9 @@ class ToddTxtImport(models.Model):
                 'state': 'pending',
             })
             nuevos += 1
-            _logger.info(f'TODD: Nuevo archivo detectado: {filename}')
+            _logger.warning(f'TODD: Nuevo archivo detectado: {filename}')
 
-        _logger.info(f'TODD: Escaneo completado - {nuevos} archivos nuevos')
+        _logger.warning(f'TODD: Escaneo completado - {nuevos} archivos nuevos')
         return nuevos
 
     def action_escanear_y_procesar(self):
@@ -90,7 +90,7 @@ class ToddTxtImport(models.Model):
         if self.state not in ('pending',):
             return
 
-        _logger.info(f'TODD: Iniciando procesamiento de {self.filename}')
+        _logger.warning(f'TODD: Iniciando procesamiento de {self.filename}')
         self.write({'state': 'processing', 'fecha_importacion': fields.Datetime.now()})
 
         try:
@@ -106,7 +106,7 @@ class ToddTxtImport(models.Model):
             self.write({'state': 'error', 'log': 'Archivo vacío o sin datos'})
             return
 
-        _logger.info(f'TODD: {self.filename} tiene {len(lineas) - 1} líneas a procesar')
+        _logger.warning(f'TODD: {self.filename} tiene {len(lineas) - 1} líneas a procesar')
 
         config = self.env['ir.config_parameter'].sudo()
         source_dir = config.get_param('todd.pdf_source_dir', '/var/logs/data/facturas')
@@ -144,14 +144,14 @@ class ToddTxtImport(models.Model):
                 if resultado.get('usuario_creado'):
                     usuarios_nuevos += 1
                 if total % 500 == 0:
-                    _logger.info(f'TODD: {self.filename} - Procesadas {total} líneas ({creadas} creadas, {actualizadas} actualizadas, {errores} errores)')
+                    _logger.warning(f'TODD: {self.filename} - Procesadas {total} líneas ({creadas} creadas, {actualizadas} actualizadas, {errores} errores)')
                     self.env.cr.commit()
             except Exception as e:
                 errores += 1
                 log.append(f'Línea {i}: ERROR - {e}')
                 _logger.error(f'TODD: Error línea {i} en {self.filename}: {e}')
 
-        _logger.info(f'TODD: Finalizado {self.filename} - Total: {total}, Creadas: {creadas}, Actualizadas: {actualizadas}, Partners: {partners_nuevos}, Usuarios: {usuarios_nuevos}, Errores: {errores}')
+        _logger.warning(f'TODD: Finalizado {self.filename} - Total: {total}, Creadas: {creadas}, Actualizadas: {actualizadas}, Partners: {partners_nuevos}, Usuarios: {usuarios_nuevos}, Errores: {errores}')
 
         self.write({
             'state': 'done',
