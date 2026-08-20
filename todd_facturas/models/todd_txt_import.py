@@ -40,8 +40,9 @@ class ToddTxtImport(models.Model):
     def action_escanear_archivos(self):
         """Escanear directorio de TXTs y crear registros pendientes"""
         txt_dir = self._get_txt_dir()
+        _logger.info(f'TODD: Escaneando directorio {txt_dir}')
         if not os.path.exists(txt_dir):
-            _logger.warning(f'Directorio TXT no existe: {txt_dir}')
+            _logger.warning(f'TODD: Directorio TXT no existe: {txt_dir}')
             return 0
 
         archivos_existentes = self.search([('filename', 'in', os.listdir(txt_dir))]).mapped('filename')
@@ -63,7 +64,9 @@ class ToddTxtImport(models.Model):
                 'state': 'pending',
             })
             nuevos += 1
+            _logger.info(f'TODD: Nuevo archivo detectado: {filename}')
 
+        _logger.info(f'TODD: Escaneo completado - {nuevos} archivos nuevos')
         return nuevos
 
     def action_escanear_y_procesar(self):
@@ -87,12 +90,14 @@ class ToddTxtImport(models.Model):
         if self.state not in ('pending',):
             return
 
+        _logger.info(f'TODD: Iniciando procesamiento de {self.filename}')
         self.write({'state': 'processing', 'fecha_importacion': fields.Datetime.now()})
 
         try:
             with open(self.filepath, 'r', encoding='latin-1') as f:
                 contenido = f.read()
         except Exception as e:
+            _logger.error(f'TODD: Error leyendo {self.filename}: {e}')
             self.write({'state': 'error', 'log': f'Error leyendo archivo: {e}'})
             return
 
@@ -100,6 +105,8 @@ class ToddTxtImport(models.Model):
         if len(lineas) < 2:
             self.write({'state': 'error', 'log': 'Archivo vacío o sin datos'})
             return
+
+        _logger.info(f'TODD: {self.filename} tiene {len(lineas) - 1} líneas a procesar')
 
         config = self.env['ir.config_parameter'].sudo()
         source_dir = config.get_param('todd.pdf_source_dir', '/var/logs/data/facturas')
@@ -136,10 +143,14 @@ class ToddTxtImport(models.Model):
                     partners_nuevos += 1
                 if resultado.get('usuario_creado'):
                     usuarios_nuevos += 1
+                if total % 100 == 0:
+                    _logger.info(f'TODD: {self.filename} - Procesadas {total} líneas ({creadas} creadas, {actualizadas} actualizadas, {errores} errores)')
             except Exception as e:
                 errores += 1
                 log.append(f'Línea {i}: ERROR - {e}')
-                _logger.error(f'Error procesando línea {i}: {e}')
+                _logger.error(f'TODD: Error línea {i} en {self.filename}: {e}')
+
+        _logger.info(f'TODD: Finalizado {self.filename} - Total: {total}, Creadas: {creadas}, Actualizadas: {actualizadas}, Partners: {partners_nuevos}, Usuarios: {usuarios_nuevos}, Errores: {errores}')
 
         self.write({
             'state': 'done',
