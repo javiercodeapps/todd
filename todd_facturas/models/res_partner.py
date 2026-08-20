@@ -55,6 +55,11 @@ class ResPartner(models.Model):
             "INSERT INTO res_groups_users_rel (gid, uid) VALUES (%s, %s) ON CONFLICT DO NOTHING",
             (portal_group.id, user.id)
         )
+        # Asegurar share=True via SQL
+        self.env.cr.execute(
+            "UPDATE res_users SET share=true WHERE id=%s",
+            (user.id,)
+        )
 
         return {'type': 'ir.actions.client', 'tag': 'display_notification',
                 'params': {'title': 'Éxito', 'message': f'Usuario portal creado: {login}', 'type': 'success'}}
@@ -98,5 +103,10 @@ class ResPartner(models.Model):
                 self.env.cr.execute(
                     "INSERT INTO res_groups_users_rel (gid, uid) VALUES (%s, %s) ON CONFLICT DO NOTHING",
                     (portal_group.id, user.id)
+                )
+                # Asegurar share=True via SQL
+                self.env.cr.execute(
+                    "UPDATE res_users SET share=true WHERE id=%s",
+                    (user.id,)
                 )
         return True
