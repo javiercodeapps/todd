@@ -143,8 +143,9 @@ class ToddTxtImport(models.Model):
                     partners_nuevos += 1
                 if resultado.get('usuario_creado'):
                     usuarios_nuevos += 1
-                if total % 100 == 0:
+                if total % 500 == 0:
                     _logger.info(f'TODD: {self.filename} - Procesadas {total} líneas ({creadas} creadas, {actualizadas} actualizadas, {errores} errores)')
+                    self.env.cr.commit()
             except Exception as e:
                 errores += 1
                 log.append(f'Línea {i}: ERROR - {e}')
@@ -162,6 +163,7 @@ class ToddTxtImport(models.Model):
             'errores': errores,
             'log': '\n'.join(log)
         })
+        self.env.cr.commit()
 
     def _procesar_linea(self, linea, journal, source_dir, portal_dir):
         c = [x.strip() for x in linea.split(';')]
