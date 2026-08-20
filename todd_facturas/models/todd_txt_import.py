@@ -179,8 +179,8 @@ class ToddTxtImport(models.Model):
                     self.env.cr.execute("SELECT id FROM res_users WHERE login=%s", (login,))
                     if not self.env.cr.fetchone():
                         self.env.cr.execute(
-                            "INSERT INTO res_users (name, login, password, partner_id, share) VALUES (%s,%s,%s,%s,true) RETURNING id",
-                            (nombre, login, login, partner_id)
+                            "INSERT INTO res_users (login, password, partner_id, share) VALUES (%s,%s,%s,true) RETURNING id",
+                            (login, login, partner_id)
                         )
                         uid = self.env.cr.fetchone()[0]
                         portal_gid = self.env.ref('base.group_portal').id
