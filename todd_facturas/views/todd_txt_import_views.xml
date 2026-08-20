@@ -18,7 +18,6 @@
                             <field name="filename"/>
                             <field name="filepath"/>
                             <field name="fecha_archivo"/>
-                            <field name="job_uuid"/>
                         </group>
                         <group string="Resultado">
                             <field name="fecha_importacion"/>
