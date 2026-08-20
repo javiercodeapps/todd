@@ -41,7 +41,8 @@ class ToddTxtImport(models.Model):
         """Escanear directorio de TXTs y crear registros pendientes"""
         txt_dir = self._get_txt_dir()
         if not os.path.exists(txt_dir):
-            os.makedirs(txt_dir)
+            _logger.warning(f'Directorio TXT no existe: {txt_dir}')
+            return 0
 
         archivos_existentes = self.search([('filename', 'in', os.listdir(txt_dir))]).mapped('filename')
 
