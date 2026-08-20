@@ -1,5 +1,5 @@
 import os
-import base64
+import shutil
 import logging
 from datetime import datetime
 from odoo import models, fields, api
@@ -17,6 +17,7 @@ class ToddTxtImport(models.Model):
     filepath = fields.Char(string='Ruta', readonly=True)
     state = fields.Selection([
         ('pending', 'Pendiente'),
+        ('queued', 'En Cola'),
         ('processing', 'Procesando'),
         ('done', 'Completado'),
         ('error', 'Error')
@@ -30,6 +31,7 @@ class ToddTxtImport(models.Model):
     usuarios_creados = fields.Integer(string='Usuarios Creados', readonly=True)
     errores = fields.Integer(string='Errores', readonly=True)
     log = fields.Text(string='Log', readonly=True)
+    job_uuid = fields.Char(string='Job UUID', readonly=True)
 
     @api.model
     def _get_txt_dir(self):
@@ -68,29 +70,42 @@ class ToddTxtImport(models.Model):
 
     @api.model
     def _procesar_pendientes(self):
-        """Procesar archivos pendientes por orden de creación (más viejo primero)"""
+        """Escanear y encolar archivos pendientes"""
+        self.action_escanear_archivos()
         pendientes = self.search([('state', '=', 'pending')], order='create_date asc')
         for txt in pendientes:
-            txt.action_procesar()
+            txt.action_encolar()
 
-    def action_procesar(self):
-        """Procesar un archivo TXT"""
+    def action_encolar(self):
+        """Encolar procesamiento de archivo"""
         self.ensure_one()
         if self.state != 'pending':
             return
 
-        self.write({'state': 'processing', 'fecha_importacion': fields.Datetime.now()})
+        self.write({'state': 'queued'})
+
+        from odoo.addons.queue_job.job import job
+        delayable = self.env['todd.txt.import'].with_delay()
+        delayable._procesar_archivo(self.id)
+
+    def _procesar_archivo(self, record_id):
+        """Método que ejecuta el job en cola"""
+        record = self.browse(record_id)
+        if not record or record.state != 'queued':
+            return
+
+        record.write({'state': 'processing', 'fecha_importacion': fields.Datetime.now()})
 
         try:
-            with open(self.filepath, 'r', encoding='latin-1') as f:
+            with open(record.filepath, 'r', encoding='latin-1') as f:
                 contenido = f.read()
         except Exception as e:
-            self.write({'state': 'error', 'log': f'Error leyendo archivo: {e}'})
+            record.write({'state': 'error', 'log': f'Error leyendo archivo: {e}'})
             return
 
         lineas = contenido.strip().split('\n')
         if len(lineas) < 2:
-            self.write({'state': 'error', 'log': 'Archivo vacío o sin datos'})
+            record.write({'state': 'error', 'log': 'Archivo vacío o sin datos'})
             return
 
         config = self.env['ir.config_parameter'].sudo()
@@ -113,7 +128,7 @@ class ToddTxtImport(models.Model):
 
         journal = self.env['account.journal'].search([('type', '=', 'sale')], limit=1)
         if not journal:
-            self.write({'state': 'error', 'log': 'No se encontró diario de ventas'})
+            record.write({'state': 'error', 'log': 'No se encontró diario de ventas'})
             return
 
         for i, linea in enumerate(lineas[1:], 2):
@@ -133,7 +148,7 @@ class ToddTxtImport(models.Model):
                 log.append(f'Línea {i}: ERROR - {e}')
                 _logger.error(f'Error procesando línea {i}: {e}')
 
-        self.write({
+        record.write({
             'state': 'done',
             'total_lineas': total,
             'facturas_creadas': creadas,
@@ -238,10 +253,14 @@ class ToddTxtImport(models.Model):
             src = os.path.join(source_dir, archivo_pdf)
             if os.path.exists(src):
                 try:
-                    import shutil
                     shutil.copy2(src, portal_dir)
                 except Exception:
                     pass
 
         resultado['nuevo'] = True
         return resultado
+
+    def action_procesar_manual(self):
+        """Procesar manualmente desde el botón"""
+        self.ensure_one()
+        self.action_encolar()
