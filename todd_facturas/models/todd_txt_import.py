@@ -173,8 +173,8 @@ class ToddTxtImport(models.Model):
                 self.env.cr.execute(
                     """INSERT INTO account_move (move_type, partner_id, invoice_date, invoice_date_due, journal_id,
                        todd_archivo_pdf, todd_nro_socio, todd_servicio, todd_periodo, ref, name,
-                       todd_estado_pago, state, company_id, currency_id, payment_state)
-                       VALUES ('out_invoice',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'posted',1,1,'not_paid')
+                       todd_estado_pago, state, company_id, currency_id, payment_state, auto_post)
+                       VALUES ('out_invoice',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'posted',1,1,'not_paid','never')
                        RETURNING id""",
                     (partner.id, fecha_fac, fecha_vto, journal.id, archivo_pdf, nro_socio,
                      servicio, periodo, numero, numero, estado_pago)
