@@ -7,6 +7,15 @@ class ResPartner(models.Model):
     todd_nro_socio = fields.Char(string='Nro. Socio')
     todd_nro_usuario = fields.Char(string='Nro. Usuario')
 
+    def _tiene_grupo_portal(self, user):
+        """Verificar si un usuario tiene el grupo portal via SQL"""
+        portal_group = self.env.ref('base.group_portal')
+        self.env.cr.execute(
+            "SELECT 1 FROM res_groups_users_rel WHERE gid = %s AND uid = %s",
+            (portal_group.id, user.id)
+        )
+        return bool(self.env.cr.fetchone())
+
     def action_crear_usuario_portal(self):
         """Crear usuario de portal para este partner"""
         self.ensure_one()
@@ -14,7 +23,7 @@ class ResPartner(models.Model):
 
         users = self.env['res.users'].search([('partner_id', '=', self.id)])
         for user in users:
-            if portal_group.id in user.groups_id.ids:
+            if self._tiene_grupo_portal(user):
                 return {'type': 'ir.actions.client', 'tag': 'display_notification',
                         'params': {'title': 'Info', 'message': f'Ya tiene usuario portal: {user.login}', 'type': 'info'}}
 
@@ -50,7 +59,15 @@ class ResPartner(models.Model):
         portal_group = self.env.ref('base.group_portal')
         for partner in self:
             users = self.env['res.users'].search([('partner_id', '=', partner.id)])
-            tiene_portal = any(portal_group.id in u.groups_id.ids for u in users)
+            tiene_portal = False
+            for u in users:
+                self.env.cr.execute(
+                    "SELECT 1 FROM res_groups_users_rel WHERE gid = %s AND uid = %s",
+                    (portal_group.id, u.id)
+                )
+                if self.env.cr.fetchone():
+                    tiene_portal = True
+                    break
 
             if not tiene_portal:
                 login = partner.vat or partner.todd_nro_socio
