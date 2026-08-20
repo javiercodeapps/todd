@@ -74,7 +74,7 @@ class ToddTxtImport(models.Model):
     def action_escanear_y_procesar(self):
         """Escanear y procesar 1 archivo pendiente"""
         self.action_escanear_archivos()
-        pendiente = self.search([('state', '=', 'pending')], order='create_date asc', limit=1)
+        pendiente = self.search([('state', '=', 'pending')], order='fecha_archivo asc', limit=1)
         if pendiente:
             pendiente.action_procesar()
 
@@ -82,7 +82,7 @@ class ToddTxtImport(models.Model):
     def _procesar_pendientes(self):
         """Escanear y procesar archivos pendientes"""
         self.action_escanear_archivos()
-        pendientes = self.search([('state', '=', 'pending')], order='create_date asc', limit=1)
+        pendientes = self.search([('state', '=', 'pending')], order='fecha_archivo asc', limit=1)
         if pendientes:
             pendientes.action_procesar()
 
