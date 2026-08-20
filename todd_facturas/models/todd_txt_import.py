@@ -228,6 +228,7 @@ class ToddTxtImport(models.Model):
                 errores += 1
                 log.append(f'Línea {i + 1}: ERROR - {e}')
                 _logger.error(f'TODD: Error línea {i + 1}: {e}')
+                self.env.cr.rollback()
 
         _logger.warning(f'TODD: {self.filename} - Batch {offset + 1}-{fin}/{total} ({creadas} creadas, {actualizadas} actualizadas)')
 
