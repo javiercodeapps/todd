@@ -86,6 +86,10 @@ class ResPartner(models.Model):
                 if self.env['res.users'].search([('login', '=', login)], limit=1):
                     continue
 
+                # Asegurar idioma del partner
+                if not partner.lang:
+                    partner.sudo().write({'lang': 'es_AR'})
+
                 password = login
                 user = self.env['res.users'].create({
                     'name': partner.name,
