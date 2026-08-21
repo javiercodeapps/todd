@@ -18,7 +18,7 @@
                             <th>Vencimiento</th>
                             <th>Total</th>
                             <th>Estado</th>
-                            <th>PDF</th>
+                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -42,8 +42,13 @@
                                     <span t-else="" class="badge bg-danger">Adeudado</span>
                                 </td>
                                 <td>
-                                    <t t-if="f.todd_pdf_disponible">
-                                        <a t-attf-href="/my/factura/{{f.id}}/pdf" class="btn btn-sm btn-primary">PDF</a>
+                                    <a t-attf-href="/my/factura/{{f.id}}/pdf" class="btn btn-sm btn-outline-primary" title="PDF">
+                                        <i class="fa fa-file-pdf-o"/>
+                                    </a>
+                                    <t t-if="f.todd_estado_pago != 'pagado'">
+                                        <a t-attf-href="/my/factura/{{f.id}}/pago" class="btn btn-sm btn-success" title="Pagar">
+                                            <i class="fa fa-credit-card"/> Pagar
+                                        </a>
                                     </t>
                                 </td>
                             </tr>
@@ -72,6 +77,159 @@
             <t t-else="">
                 <p class="text-center">No tienes facturas.</p>
             </t>
+        </t>
+    </template>
+
+    <!-- Página de pago -->
+    <template id="portal_pago" name="Pago de Factura">
+        <t t-call="portal.portal_layout">
+            <div class="container py-4">
+                <div class="row justify-content-center">
+                    <div class="col-lg-8">
+                        <!-- Factura -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-primary text-white">
+                                <h4 class="mb-0">Factura <t t-esc="factura.name"/></h4>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <table class="table table-borderless">
+                                            <tr>
+                                                <td class="fw-bold">Servicio:</td>
+                                                <td>
+                                                    <t t-if="factura.todd_servicio == 'E'"><span class="rounded px-2 py-1" style="background-color:#FF6B6B;color:#fff;">Energía</span></t>
+                                                    <t t-elif="factura.todd_servicio == 'A'"><span class="rounded px-2 py-1" style="background-color:#4ECDC4;color:#fff;">Agua</span></t>
+                                                    <t t-elif="factura.todd_servicio == 'T'"><span class="rounded px-2 py-1" style="background-color:#45B7D1;color:#fff;">Telefonía</span></t>
+                                                    <t t-elif="factura.todd_servicio == 'I'"><span class="rounded px-2 py-1" style="background-color:#96CEB4;color:#fff;">Internet</span></t>
+                                                    <t t-elif="factura.todd_servicio == 'S'"><span class="rounded px-2 py-1" style="background-color:#9B59B6;color:#fff;">Sepelio</span></t>
+                                                    <t t-elif="factura.todd_servicio == 'N'"><span class="rounded px-2 py-1" style="background-color:#F39C12;color:#fff;">Nichos</span></t>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Período:</td>
+                                                <td><t t-if="factura.todd_periodo and len(factura.todd_periodo) == 6"><t t-out="factura.todd_periodo[4:6]"/>/<t t-out="factura.todd_periodo[0:4]"/></t></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Fecha:</td>
+                                                <td><t t-esc="factura.invoice_date" t-options="{'widget':'date'}"/></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Vencimiento:</td>
+                                                <td><t t-esc="factura.invoice_date_due" t-options="{'widget':'date'}"/></td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                    <div class="col-md-6 text-end">
+                                        <h2 class="text-danger">
+                                            <t t-esc="factura.amount_total" t-options="{'widget':'monetary','display_currency':factura.currency_id}"/>
+                                        </h2>
+                                        <p class="text-muted mb-0">Importe a pagar</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Estado de deuda -->
+                        <t t-if="factura.todd_estado_pago == 'pagado'">
+                            <div class="alert alert-success text-center">
+                                <h4><i class="fa fa-check-circle"/> Factura pagada</h4>
+                                <p class="mb-0">Esta factura ya fue abonada.</p>
+                            </div>
+                        </t>
+                        <t t-elif="mas_90_dias">
+                            <!-- Más de 90 días: contactar -->
+                            <div class="card border-warning">
+                                <div class="card-header bg-warning text-dark">
+                                    <h5 class="mb-0"><i class="fa fa-exclamation-triangle"/> Deuda con más de 90 días</h5>
+                                </div>
+                                <div class="card-body text-center">
+                                    <p class="fs-5">Su factura tiene <strong><t t-out="dias_deuda"/></strong> días de antigüedad.</p>
+                                    <p>Para realizar el pago de esta factura, por favor contacte a nuestro equipo de cobranzas.</p>
+                                    <div class="mt-4">
+                                        <a href="tel:+5492464543900" class="btn btn-warning btn-lg me-2">
+                                            <i class="fa fa-phone"/> Llamar: (2464) 54-3900
+                                        </a>
+                                        <a href="https://wa.me/5492464543900" class="btn btn-success btn-lg">
+                                            <i class="fa fa-whatsapp"/> WhatsApp
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                        <t t-else="">
+                            <!-- Menos de 90 días: opciones de pago -->
+                            <div class="card border-success">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="mb-0"><i class="fa fa-credit-card"/> Opciones de pago</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p class="fs-5">Su factura tiene <strong><t t-out="dias_deuda"/></strong> días de antigüedad.</p>
+                                    <p>Seleccione una opción de pago:</p>
+
+                                    <div class="row g-3 mt-3">
+                                        <!-- Transferencia -->
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-body text-center">
+                                                    <i class="fa fa-university fa-3x text-primary mb-3"/>
+                                                    <h5>Transferencia Bancaria</h5>
+                                                    <p class="text-muted">Realice una transferencia a nuestra cuenta</p>
+                                                    <div class="text-start bg-light p-3 rounded">
+                                                        <p class="mb-1"><strong>Banco:</strong> Banco de la Nación Argentina</p>
+                                                        <p class="mb-1"><strong>Cuenta:</strong> Caja de Ahorro en Pesos</p>
+                                                        <p class="mb-1"><strong>CBU:</strong> 00701049 3000 4005 4893 26</p>
+                                                        <p class="mb-0"><strong>Titular:</strong> Cooperativa de Servicios Públicos Todd Ltda</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Débito automático -->
+                                        <div class="col-md-6">
+                                            <div class="card h-100">
+                                                <div class="card-body text-center">
+                                                    <i class="fa fa-calendar-check-o fa-3x text-success mb-3"/>
+                                                    <h5>Débito Automático</h5>
+                                                    <p class="text-muted">Si tiene débito automático, el monto se debitará en la fecha de vencimiento</p>
+                                                    <div class="text-start bg-light p-3 rounded">
+                                                        <p class="mb-1"><strong>Próximo débito:</strong> <t t-esc="factura.invoice_date_due" t-options="{'widget':'date'}"/></p>
+                                                        <p class="mb-0"><strong>Monto:</strong> <t t-esc="factura.amount_total" t-options="{'widget':'monetary','display_currency':factura.currency_id}"/></p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Pago en sucursal -->
+                                        <div class="col-12">
+                                            <div class="card">
+                                                <div class="card-body text-center">
+                                                    <i class="fa fa-map-marker fa-3x text-info mb-3"/>
+                                                    <h5>Pago en Sucursal</h5>
+                                                    <p class="text-muted">Puede abonar en efectivo o con tarjeta en nuestras oficinas</p>
+                                                    <p class="mb-0"><strong>Dirección:</strong> Av. Independencia 264 - Pehuajó, Buenos Aires</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="text-center mt-4">
+                                        <a t-attf-href="/my/factura/{{factura.id}}/pdf" class="btn btn-outline-primary btn-lg">
+                                            <i class="fa fa-file-pdf-o"/> Descargar Factura PDF
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+
+                        <div class="text-center mt-4">
+                            <a href="/my/facturas" class="btn btn-outline-secondary">
+                                <i class="fa fa-arrow-left"/> Volver a Mis Facturas
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </t>
     </template>
 </odoo>

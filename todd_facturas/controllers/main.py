@@ -1,5 +1,6 @@
 import os
 import mimetypes
+from datetime import date, timedelta
 from odoo import http
 from odoo.http import request, content_disposition
 
@@ -37,6 +38,30 @@ class ToddPortal(http.Controller):
             'page_end': min(page * ITEMS_PER_PAGE, total),
         }
         return request.render('todd_facturas.portal_facturas', values)
+
+    @http.route('/my/factura/<int:factura_id>/pago', type='http', auth='user', website=True)
+    def factura_pago(self, factura_id, **kw):
+        partner = request.env.user.partner_id
+        factura = request.env['account.move'].sudo().search([
+            ('id', '=', factura_id),
+            ('partner_id', '=', partner.id),
+            ('move_type', '=', 'out_invoice'),
+        ], limit=1)
+
+        if not factura:
+            return request.redirect('/my/facturas')
+
+        # Calcular días de deuda
+        hoy = date.today()
+        dias_deuda = (hoy - factura.invoice_date).days if factura.invoice_date else 0
+        mas_90_dias = dias_deuda > 90
+
+        values = {
+            'factura': factura,
+            'dias_deuda': dias_deuda,
+            'mas_90_dias': mas_90_dias,
+        }
+        return request.render('todd_facturas.portal_pago', values)
 
     @http.route('/my/factura/<int:factura_id>/pdf', type='http', auth='user', website=True)
     def factura_pdf(self, factura_id, **kw):
