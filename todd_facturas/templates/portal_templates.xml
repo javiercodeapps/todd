@@ -5,6 +5,9 @@
             <t t-set="breadcrumbs_searchbar" t-value="True"/>
             <t t-call="portal.portal_searchbar"/>
             <t t-if="facturas">
+                <div class="mb-3 text-muted">
+                    Mostrando <t t-out="page_start"/> - <t t-out="page_end"/> de <t t-out="total"/> facturas
+                </div>
                 <table class="table table-striped">
                     <thead>
                         <tr>
@@ -22,7 +25,14 @@
                         <t t-foreach="facturas" t-as="f">
                             <tr>
                                 <td><t t-esc="f.name"/></td>
-                                <td><t t-if="f.todd_servicio == 'E'">Energía</t><t t-elif="f.todd_servicio == 'A'">Agua</t><t t-elif="f.todd_servicio == 'T'">Telefonía</t><t t-elif="f.todd_servicio == 'I'">Internet</t><t t-elif="f.todd_servicio == 'S'">Sepelio</t><t t-elif="f.todd_servicio == 'N'">Nichos</t></td>
+                                <td>
+                                    <t t-if="f.todd_servicio == 'E'"><span class="badge" style="background-color:#FF6B6B;color:#fff;">Energía</span></t>
+                                    <t t-elif="f.todd_servicio == 'A'"><span class="badge" style="background-color:#4ECDC4;color:#fff;">Agua</span></t>
+                                    <t t-elif="f.todd_servicio == 'T'"><span class="badge" style="background-color:#45B7D1;color:#fff;">Telefonía</span></t>
+                                    <t t-elif="f.todd_servicio == 'I'"><span class="badge" style="background-color:#96CEB4;color:#fff;">Internet</span></t>
+                                    <t t-elif="f.todd_servicio == 'S'"><span class="badge" style="background-color:#9B59B6;color:#fff;">Sepelio</span></t>
+                                    <t t-elif="f.todd_servicio == 'N'"><span class="badge" style="background-color:#F39C12;color:#fff;">Nichos</span></t>
+                                </td>
                                 <td><t t-if="f.todd_periodo and len(f.todd_periodo) == 6"><t t-out="f.todd_periodo[4:6]"/>/<t t-out="f.todd_periodo[0:4]"/></t></td>
                                 <td><t t-esc="f.invoice_date" t-options="{'widget':'date'}"/></td>
                                 <td><t t-esc="f.invoice_date_due" t-options="{'widget':'date'}"/></td>
@@ -40,6 +50,24 @@
                         </t>
                     </tbody>
                 </table>
+                <!-- Paginación -->
+                <t t-if="total_pages > 1">
+                    <nav>
+                        <ul class="pagination justify-content-center">
+                            <li class="page-item" t-att-class="'disabled' if page == 1 else ''">
+                                <a class="page-link" t-attf-href="/my/facturas?page={{page - 1}}">Anterior</a>
+                            </li>
+                            <t t-foreach="range(1, total_pages + 1)" t-as="p">
+                                <li class="page-item" t-att-class="'active' if p == page else ''">
+                                    <a class="page-link" t-attf-href="/my/facturas?page={{p}}"><t t-out="p"/></a>
+                                </li>
+                            </t>
+                            <li class="page-item" t-att-class="'disabled' if page == total_pages else ''">
+                                <a class="page-link" t-attf-href="/my/facturas?page={{page + 1}}">Siguiente</a>
+                            </li>
+                        </ul>
+                    </nav>
+                </t>
             </t>
             <t t-else="">
                 <p class="text-center">No tienes facturas.</p>

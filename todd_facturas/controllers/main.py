@@ -3,19 +3,40 @@ import mimetypes
 from odoo import http
 from odoo.http import request, content_disposition
 
+ITEMS_PER_PAGE = 10
+
 
 class ToddPortal(http.Controller):
 
     @http.route('/my/facturas', type='http', auth='user', website=True)
-    def facturas(self, **kw):
+    def facturas(self, page=1, **kw):
         partner = request.env.user.partner_id
-        facturas = request.env['account.move'].sudo().search([
+
+        domain = [
             ('partner_id', '=', partner.id),
             ('move_type', '=', 'out_invoice'),
             ('state', '=', 'posted'),
             ('todd_archivo_pdf', '!=', False)
-        ])
-        return request.render('todd_facturas.portal_facturas', {'facturas': facturas})
+        ]
+
+        total = request.env['account.move'].sudo().search_count(domain)
+        facturas = request.env['account.move'].sudo().search(
+            domain, order='invoice_date desc',
+            limit=ITEMS_PER_PAGE, offset=(int(page) - 1) * ITEMS_PER_PAGE
+        )
+
+        page = int(page)
+        total_pages = (total + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
+
+        values = {
+            'facturas': facturas,
+            'page': page,
+            'total_pages': total_pages,
+            'total': total,
+            'page_start': (page - 1) * ITEMS_PER_PAGE + 1,
+            'page_end': min(page * ITEMS_PER_PAGE, total),
+        }
+        return request.render('todd_facturas.portal_facturas', values)
 
     @http.route('/my/factura/<int:factura_id>/pdf', type='http', auth='user', website=True)
     def factura_pdf(self, factura_id, **kw):
