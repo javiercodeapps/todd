@@ -97,8 +97,8 @@ class ToddTxtImport(models.Model):
         _logger.warning(f'TODD: {self.filename} - Total: {total}, desde línea {offset + 1}')
 
         config = self.env['ir.config_parameter'].sudo()
-        source_dir = config.get_param('todd.pdf_source_dir', '/var/logs/data/facturas')
-        portal_dir = config.get_param('todd.pdf_portal_dir', '/var/logs/data/facturas_web')
+        source_dir = config.get_param('todd.pdf_source_dir', '/var/log/odoo/data/facturas')
+        portal_dir = config.get_param('todd.pdf_portal_dir', '/var/log/odoo/data/facturas_web')
         if not os.path.exists(portal_dir):
             try: os.makedirs(portal_dir)
             except: pass

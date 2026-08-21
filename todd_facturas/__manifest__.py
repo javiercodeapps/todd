@@ -9,7 +9,6 @@
     'data': [
         'security/todd_security.xml',
         'security/ir.model.access.csv',
-        'views/todd_config_settings_views.xml',
         'views/todd_factura_views.xml',
         'views/todd_txt_import_views.xml',
         'views/res_partner_views.xml',
