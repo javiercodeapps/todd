@@ -1,7 +1,7 @@
 {
     'name': "Todd Facturas",
     'version': '19.0.1.0.0',
-    'depends': ['base', 'account', 'portal'],
+    'depends': ['base', 'portal'],
     'author': "Todd",
     'category': 'Accounting',
     'summary': 'Importación de facturas desde archivos TXT',
@@ -9,11 +9,10 @@
     'data': [
         'security/todd_security.xml',
         'security/ir.model.access.csv',
-        'wizard/todd_import_wizard_views.xml',
         'views/todd_config_settings_views.xml',
+        'views/todd_factura_views.xml',
         'views/todd_txt_import_views.xml',
         'views/res_partner_views.xml',
-        'views/account_move_views.xml',
         'views/todd_menu.xml',
         'data/todd_cron.xml',
         'templates/portal_templates.xml',

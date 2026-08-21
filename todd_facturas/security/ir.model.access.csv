@@ -1,4 +1,6 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_todd_factura_user,todd.factura.user,model_todd_factura,base.group_user,1,0,0,0
+access_todd_factura_manager,todd.factura.manager,model_todd_factura,base.group_system,1,1,1,1
 access_todd_config_user,todd.config.settings.user,model_todd_config_settings,base.group_user,1,0,0,0
 access_todd_config_manager,todd.config.settings.manager,model_todd_config_settings,base.group_system,1,1,1,1
 access_todd_import_user,todd.import.wizard.user,model_todd_import_wizard,base.group_user,1,1,1,1

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_todd_factura_form" model="ir.ui.view">
+        <field name="name">todd.factura.form</field>
+        <field name="model">todd.factura</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group string="Factura">
+                            <field name="numero_completo"/>
+                            <field name="partner_id"/>
+                            <field name="referencia"/>
+                            <field name="nro_usuario"/>
+                            <field name="periodo"/>
+                            <field name="fecha_emision"/>
+                            <field name="fecha_vencimiento"/>
+                        </group>
+                        <group string="Importes">
+                            <field name="importe"/>
+                            <field name="importe_2do_vencimiento"/>
+                            <field name="estado_pago"/>
+                            <field name="servicio"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Datos">
+                            <field name="domicilio"/>
+                            <field name="dni"/>
+                            <field name="archivo_pdf"/>
+                            <field name="archivo_pdf_ruta"/>
+                            <field name="pdf_disponible"/>
+                        </group>
+                        <group string="Pagos Electrónicos">
+                            <field name="cod_pago_electronico"/>
+                            <field name="cod_pago_electronico_otros"/>
+                            <field name="codigo_estado"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_todd_factura_list" model="ir.ui.view">
+        <field name="name">todd.factura.list</field>
+        <field name="model">todd.factura</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="numero_completo"/>
+                <field name="partner_id"/>
+                <field name="periodo"/>
+                <field name="fecha_emision"/>
+                <field name="fecha_vencimiento"/>
+                <field name="importe"/>
+                <field name="servicio"/>
+                <field name="estado_pago"/>
+                <field name="pdf_disponible"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_todd_factura_search" model="ir.ui.view">
+        <field name="name">todd.factura.search</field>
+        <field name="model">todd.factura</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="numero_completo"/>
+                <field name="partner_id"/>
+                <field name="referencia"/>
+                <field name="periodo"/>
+                <separator/>
+                <filter name="pagadas" string="Pagadas" domain="[('estado_pago','=','pagado')]"/>
+                <filter name="adeudadas" string="Adeudadas" domain="[('estado_pago','=','adeudado')]"/>
+                <separator/>
+                <group expand="0" string="Servicio">
+                    <filter string="Energía" domain="[('servicio','=','E')]"/>
+                    <filter string="Agua" domain="[('servicio','=','A')]"/>
+                    <filter string="Internet" domain="[('servicio','=','I')]"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_todd_factura" model="ir.actions.act_window">
+        <field name="name">Facturas Todd</field>
+        <field name="res_model">todd.factura</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>
