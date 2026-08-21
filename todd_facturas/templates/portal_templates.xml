@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!-- Reemplazar link de facturas en el portal home -->
-    <template id="portal_home_custom" name="Portal Home Custom" inherit_id="portal.portal_layout_homepage">
+    <template id="portal_home_custom" name="Portal Home Custom" inherit_id="portal.portal_my_home">
         <xpath expr="//a[@href='/my/invoices']" position="replace">
             <a href="/my/facturas" title="Mis Facturas" class="d-flex gap-2 gap-md-3 py-3 pe-2 px-md-3 h-100 rounded text-decoration-none bg-100">
                 <div class="o_portal_icon d-block align-self-start">
