@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- Quitar alerta de facturas a pagar -->
+    <template id="portal_home_remove_alert" name="Remove Alert" inherit_id="portal.portal_my_home">
+        <xpath expr="//div[@id='portal_alert_category']" position="replace"/>
+    </template>
+
+    <!-- Cambiar link de facturas por /my/facturas -->
+    <template id="portal_home_custom_invoices" name="Custom Invoices Link" inherit_id="portal.portal_my_home">
+        <xpath expr="//a[@href='/my/invoices?filterby=invoices']" position="attributes">
+            <attribute name="href">/my/facturas</attribute>
+        </xpath>
+    </template>
+
     <template id="portal_facturas" name="Mis Facturas">
         <t t-call="portal.portal_layout">
             <t t-set="breadcrumbs_searchbar" t-value="True"/>
