@@ -60,28 +60,6 @@
         </field>
     </record>
 
-    <record id="view_todd_factura_search" model="ir.ui.view">
-        <field name="name">todd.factura.search</field>
-        <field name="model">todd.factura</field>
-        <field name="arch" type="xml">
-            <search>
-                <field name="numero_completo"/>
-                <field name="partner_id"/>
-                <field name="referencia"/>
-                <field name="periodo"/>
-                <separator/>
-                <filter name="pagadas" string="Pagadas" domain="[('estado_pago','=','pagado')]"/>
-                <filter name="adeudadas" string="Adeudadas" domain="[('estado_pago','=','adeudado')]"/>
-                <separator/>
-                <group expand="0" string="Servicio">
-                    <filter string="Energía" domain="[('servicio','=','E')]"/>
-                    <filter string="Agua" domain="[('servicio','=','A')]"/>
-                    <filter string="Internet" domain="[('servicio','=','I')]"/>
-                </group>
-            </search>
-        </field>
-    </record>
-
     <record id="action_todd_factura" model="ir.actions.act_window">
         <field name="name">Facturas Todd</field>
         <field name="res_model">todd.factura</field>
