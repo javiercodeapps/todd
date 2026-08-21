@@ -192,24 +192,27 @@ class ToddTxtImport(models.Model):
                 estado_pago = 'pagado' if 'Pagado' in lp['estado_comp'] else 'adeudado'
                 servicio_nombre = {'E': 'Energía', 'A': 'Agua', 'T': 'Telefonía', 'I': 'Internet', 'S': 'Sepelio', 'N': 'Nichos'}.get(lp['servicio'], lp['servicio'])
 
-                self.env.cr.execute(
-                    """INSERT INTO account_move (move_type, partner_id, invoice_date, invoice_date_due, journal_id,
-                       todd_archivo_pdf, todd_nro_socio, todd_servicio, todd_periodo, ref, name,
-                       todd_estado_pago, state, company_id, currency_id, payment_state, auto_post, date)
-                       VALUES ('out_invoice',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'posted',1,1,'not_paid','never',%s)
-                       RETURNING id""",
-                    (lp['partner_id'], lp['fecha_fac'], lp['fecha_vto'], self.env.company.id,
-                     lp['archivo_pdf'], lp['nro_socio'], lp['servicio'], lp['periodo'],
-                     numero, numero, estado_pago, lp['fecha_fac'])
-                )
-                move_id = self.env.cr.fetchone()[0]
-
-                self.env.cr.execute(
-                    """INSERT INTO account_move_line (move_id, name, quantity, price_unit, account_id, debit, credit, date, company_id, currency_id, display_type)
-                       VALUES (%s,%s,1,%s,%s,%s,%s,CURRENT_DATE,%s,1,'product')""",
-                    (move_id, f'{servicio_nombre} - {lp["periodo"]}', lp['importe'], account.id,
-                     lp['importe'], 0, self.env.company.id)
-                )
+                # Crear factura via ORM para que calcule importes correctamente
+                move = self.env['account.move'].create({
+                    'move_type': 'out_invoice',
+                    'partner_id': lp['partner_id'],
+                    'invoice_date': lp['fecha_fac'],
+                    'invoice_date_due': lp['fecha_vto'],
+                    'journal_id': journal.id,
+                    'todd_archivo_pdf': lp['archivo_pdf'],
+                    'todd_nro_socio': lp['nro_socio'],
+                    'todd_servicio': lp['servicio'],
+                    'todd_periodo': lp['periodo'],
+                    'ref': numero,
+                    'invoice_line_ids': [(0, 0, {
+                        'name': f'{servicio_nombre} - {lp["periodo"]}',
+                        'quantity': 1,
+                        'price_unit': lp['importe'],
+                        'account_id': account.id,
+                    })]
+                })
+                move.write({'name': numero, 'todd_estado_pago': estado_pago})
+                move.action_post()
 
                 # Copiar PDF
                 if os.path.exists(source_dir) and os.path.exists(portal_dir):
