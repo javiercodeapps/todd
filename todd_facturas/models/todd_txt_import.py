@@ -157,6 +157,8 @@ class ToddTxtImport(models.Model):
                     'fecha_vto': datetime.strptime(c[6], '%d/%m/%Y').date(),
                     'importe': float(c[7].replace(',', '.')),
                     'archivo_pdf': c[8],
+                    'cod_pago_electronico': c[9].strip(),
+                    'cod_pago_electronico_otros': c[10].strip(),
                     'estado_comp': c[11].strip(),
                     'servicio': c[14],
                     'partner_id': partners_map[nro_socio],
@@ -203,6 +205,8 @@ class ToddTxtImport(models.Model):
                     'todd_nro_socio': lp['nro_socio'],
                     'todd_servicio': lp['servicio'],
                     'todd_periodo': lp['periodo'],
+                    'todd_cod_pago_electronico': lp['cod_pago_electronico'],
+                    'todd_cod_pago_electronico_otros': lp['cod_pago_electronico_otros'],
                     'ref': numero,
                     'invoice_line_ids': [(0, 0, {
                         'name': f'{servicio_nombre} - {lp["periodo"]}',

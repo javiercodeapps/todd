@@ -18,6 +18,8 @@ class AccountMove(models.Model):
         ('pagado', 'Pagado'),
         ('adeudado', 'Adeudado')
     ], string='Estado de Pago', default='adeudado')
+    todd_cod_pago_electronico = fields.Char(string='Cód. Pago Electrónico')
+    todd_cod_pago_electronico_otros = fields.Char(string='Cód. Pago Electrónico Otros')
 
     @api.depends('todd_archivo_pdf')
     def _compute_todd_pdf_ruta(self):

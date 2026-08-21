@@ -12,6 +12,8 @@
                         <field name="todd_nro_socio"/>
                         <field name="todd_servicio"/>
                         <field name="todd_periodo"/>
+                        <field name="todd_cod_pago_electronico"/>
+                        <field name="todd_cod_pago_electronico_otros"/>
                         <field name="todd_pdf_disponible" readonly="1"/>
                     </group>
                 </page>
