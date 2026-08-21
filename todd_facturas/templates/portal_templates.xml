@@ -26,12 +26,12 @@
                             <tr>
                                 <td><t t-esc="f.name"/></td>
                                 <td>
-                                    <t t-if="f.todd_servicio == 'E'"><span class="badge" style="background-color:#FF6B6B;color:#fff;">Energía</span></t>
-                                    <t t-elif="f.todd_servicio == 'A'"><span class="badge" style="background-color:#4ECDC4;color:#fff;">Agua</span></t>
-                                    <t t-elif="f.todd_servicio == 'T'"><span class="badge" style="background-color:#45B7D1;color:#fff;">Telefonía</span></t>
-                                    <t t-elif="f.todd_servicio == 'I'"><span class="badge" style="background-color:#96CEB4;color:#fff;">Internet</span></t>
-                                    <t t-elif="f.todd_servicio == 'S'"><span class="badge" style="background-color:#9B59B6;color:#fff;">Sepelio</span></t>
-                                    <t t-elif="f.todd_servicio == 'N'"><span class="badge" style="background-color:#F39C12;color:#fff;">Nichos</span></t>
+                                    <t t-if="f.todd_servicio == 'E'"><span class="rounded px-2 py-1" style="background-color:#FF6B6B;color:#fff;">Energía</span></t>
+                                    <t t-elif="f.todd_servicio == 'A'"><span class="rounded px-2 py-1" style="background-color:#4ECDC4;color:#fff;">Agua</span></t>
+                                    <t t-elif="f.todd_servicio == 'T'"><span class="rounded px-2 py-1" style="background-color:#45B7D1;color:#fff;">Telefonía</span></t>
+                                    <t t-elif="f.todd_servicio == 'I'"><span class="rounded px-2 py-1" style="background-color:#96CEB4;color:#fff;">Internet</span></t>
+                                    <t t-elif="f.todd_servicio == 'S'"><span class="rounded px-2 py-1" style="background-color:#9B59B6;color:#fff;">Sepelio</span></t>
+                                    <t t-elif="f.todd_servicio == 'N'"><span class="rounded px-2 py-1" style="background-color:#F39C12;color:#fff;">Nichos</span></t>
                                 </td>
                                 <td><t t-if="f.todd_periodo and len(f.todd_periodo) == 6"><t t-out="f.todd_periodo[4:6]"/>/<t t-out="f.todd_periodo[0:4]"/></t></td>
                                 <td><t t-esc="f.invoice_date" t-options="{'widget':'date'}"/></td>
