@@ -9,8 +9,9 @@
     'data': [
         'security/todd_security.xml',
         'security/ir.model.access.csv',
+        'wizard/todd_import_wizard_views.xml',
+        'wizard/todd_txt_import_views.xml',
         'views/todd_factura_views.xml',
-        'views/todd_txt_import_views.xml',
         'views/res_partner_views.xml',
         'views/todd_menu.xml',
         'data/todd_cron.xml',
