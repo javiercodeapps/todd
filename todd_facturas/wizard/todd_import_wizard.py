@@ -1,9 +1,12 @@
 import base64
 import os
 import shutil
+import logging
 from datetime import datetime
 from odoo import models, fields, api
 from odoo.exceptions import UserError
+
+_logger = logging.getLogger(__name__)
 
 
 class ToddImportWizard(models.TransientModel):
@@ -12,21 +15,11 @@ class ToddImportWizard(models.TransientModel):
 
     archivo_txt = fields.Binary(string='Archivo TXT', required=True)
     archivo_nombre = fields.Char(string='Nombre')
-    journal_id = fields.Many2one('account.journal', string='Diario', domain="[('type','=','sale')]")
-    copiar_pdfs = fields.Boolean(string='Copiar PDFs', default=True)
     state = fields.Selection([('draft', 'Borrador'), ('done', 'Listo')], default='draft')
     log = fields.Text(string='Log', readonly=True)
     total = fields.Integer(readonly=True)
     ok = fields.Integer(readonly=True)
     errores = fields.Integer(readonly=True)
-
-    @api.model
-    def default_get(self, fields_list):
-        res = super().default_get(fields_list)
-        j = self.env['account.journal'].search([('type', '=', 'sale')], limit=1)
-        if j:
-            res['journal_id'] = j.id
-        return res
 
     def action_importar(self):
         self.ensure_one()
@@ -38,110 +31,94 @@ class ToddImportWizard(models.TransientModel):
         if len(lineas) < 2:
             raise UserError('TXT vacío')
 
-        config = self.env['ir.config_parameter'].sudo()
-        source_dir = config.get_param('todd.pdf_source_dir', '/mnt/extra-addons/todd/facturas')
-        portal_dir = config.get_param('todd.pdf_portal_dir', '/mnt/extra-addons/todd/facturas_web')
-
-        if self.copiar_pdfs and not os.path.exists(portal_dir):
-            try:
-                os.makedirs(portal_dir)
-            except OSError:
-                pass
-
         log = []
         total = ok = errores = 0
 
         for i, linea in enumerate(lineas[1:], 2):
             total += 1
             try:
-                self._procesar(linea, log, source_dir, portal_dir)
+                c = [x.strip() for x in linea.split(';')]
+                if len(c) < 17:
+                    continue
+
+                nro_socio = c[0]
+                nro_usuario = c[1]
+                periodo = c[2]
+                pto_venta = int(c[3])
+                nro_fac = int(c[4])
+                fecha_fac = datetime.strptime(c[5], '%d/%m/%Y').date()
+                fecha_vto = datetime.strptime(c[6], '%d/%m/%Y').date()
+                importe = float(c[7].replace(',', '.'))
+                archivo_pdf = c[8]
+                cod_pago = c[9].strip()
+                cod_pago_otros = c[10].strip()
+                estado_comp = c[11].strip()
+                domicilio = c[12]
+                nombre = c[13]
+                servicio = c[14]
+                importe_2do = float(c[15].replace(',', '.')) if c[15].strip() else 0
+                dni = c[17].strip() if len(c) > 17 else ''
+
+                # Partner
+                partner = self.env['res.partner'].search([('todd_nro_socio', '=', nro_socio)], limit=1)
+                if not partner:
+                    partner = self.env['res.partner'].create({
+                        'name': nombre, 'todd_nro_socio': nro_socio, 'todd_nro_usuario': nro_usuario,
+                        'street': domicilio, 'vat': dni if dni and dni != '0' else False
+                    })
+                partner.crear_usuario_portal_si_no_tiene()
+
+                # PDF
+                config = self.env['ir.config_parameter'].sudo()
+                source_dir = config.get_param('todd.pdf_source_dir', '/var/log/odoo/data/facturas')
+                portal_dir = config.get_param('todd.pdf_portal_dir', '/var/log/odoo/data/facturas_web')
+                pdf_ruta = ''
+                if os.path.exists(source_dir) and os.path.exists(portal_dir):
+                    src = os.path.join(source_dir, archivo_pdf)
+                    if os.path.exists(src):
+                        try:
+                            shutil.copy2(src, portal_dir)
+                            pdf_ruta = os.path.join(portal_dir, archivo_pdf)
+                        except: pass
+
+                estado_pago = 'pagado' if 'Pagado' in estado_comp else 'adeudado'
+
+                # Verificar duplicada
+                existe = self.env.cr.execute(
+                    "SELECT id FROM todd_factura WHERE partner_id=%s AND archivo_pdf=%s LIMIT 1",
+                    (partner.id, archivo_pdf)
+                )
+                if self.env.cr.fetchone():
+                    if 'Pagado' in estado_comp:
+                        self.env.cr.execute(
+                            "UPDATE todd_factura SET estado_pago='pagado' WHERE partner_id=%s AND archivo_pdf=%s",
+                            (partner.id, archivo_pdf)
+                        )
+                    continue
+
+                self.env.cr.execute(
+                    """INSERT INTO todd_factura (partner_id, referencia, nro_usuario, periodo, punto_venta, nro_factura,
+                       numero_completo, fecha_emision, fecha_vencimiento, importe, archivo_pdf, cod_pago_electronico,
+                       cod_pago_electronico_otros, estado_pago, domicilio, servicio, importe_2do_vencimiento, dni,
+                       archivo_pdf_ruta)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                    (partner.id, nro_socio, nro_usuario, periodo, pto_venta, nro_fac,
+                     f'{pto_venta:04d}-{nro_fac:08d}', fecha_fac, fecha_vto, importe, archivo_pdf,
+                     cod_pago, cod_pago_otros, estado_pago, domicilio, servicio, importe_2do,
+                     dni, pdf_ruta)
+                )
                 ok += 1
             except Exception as e:
                 errores += 1
                 log.append(f'Línea {i}: ERROR - {e}')
 
+        self.env.cr.commit()
+
         self.write({'state': 'done', 'log': '\n'.join(log), 'total': total, 'ok': ok, 'errores': errores})
         return {
             'type': 'ir.actions.act_window',
-            'res_model': 'account.move',
+            'res_model': 'todd.factura',
             'view_mode': 'list',
-            'domain': [('move_type', '=', 'out_invoice'), ('todd_archivo_pdf', '!=', False)],
             'target': 'current',
             'context': {'create': False}
         }
-
-    def _procesar(self, linea, log, source_dir, portal_dir):
-        c = [x.strip() for x in linea.split(';')]
-        if len(c) < 17:
-            raise ValueError('Campos insuficientes')
-
-        nro_socio, nro_usuario, periodo = c[0], c[1], c[2]
-        pto_venta, nro_fac = int(c[3]), int(c[4])
-        fecha_fac = datetime.strptime(c[5], '%d/%m/%Y').date()
-        fecha_vto = datetime.strptime(c[6], '%d/%m/%Y').date()
-        importe = float(c[7].replace(',', '.'))
-        archivo_pdf = c[8]
-        estado_comp = c[11].strip()
-        domicilio = c[12]
-        nombre = c[13]
-        servicio = c[14]
-        dni = c[17] if len(c) > 17 else ''
-
-        partner = self.env['res.partner'].search([('todd_nro_socio', '=', nro_socio)], limit=1)
-        if not partner:
-            partner = self.env['res.partner'].create({
-                'name': nombre, 'todd_nro_socio': nro_socio, 'todd_nro_usuario': nro_usuario,
-                'street': domicilio, 'vat': dni if dni and dni != '0' else False
-            })
-
-        # Crear usuario portal
-        partner.crear_usuario_portal_si_no_tiene()
-
-        existe = self.env['account.move'].search([('partner_id', '=', partner.id), ('todd_archivo_pdf', '=', archivo_pdf)], limit=1)
-        if existe:
-            if 'Pagado' in estado_comp and existe.todd_estado_pago != 'pagado':
-                existe.action_registrar_pago()
-                log.append(f'{nombre}: actualizado a Pagado')
-            elif 'Adeudado' in estado_comp and existe.todd_estado_pago != 'adeudado':
-                existe.todd_estado_pago = 'adeudado'
-                log.append(f'{nombre}: actualizado a Adeudado')
-            else:
-                log.append(f'{nombre}: ya existe sin cambios')
-            return
-
-        numero_factura = f'{pto_venta:04d}-{nro_fac:08d}'
-        servicio_nombre = {'E': 'Energía', 'A': 'Agua', 'T': 'Telefonía', 'I': 'Internet', 'S': 'Sepelio', 'N': 'Nichos'}.get(servicio, servicio)
-
-        move = self.env['account.move'].create({
-            'move_type': 'out_invoice',
-            'partner_id': partner.id,
-            'invoice_date': fecha_fac,
-            'invoice_date_due': fecha_vto,
-            'journal_id': self.journal_id.id,
-            'todd_archivo_pdf': archivo_pdf,
-            'todd_nro_socio': nro_socio,
-            'todd_servicio': servicio,
-            'todd_periodo': periodo,
-            'ref': numero_factura,
-            'invoice_line_ids': [(0, 0, {
-                'name': f'{servicio_nombre} - {periodo}',
-                'quantity': 1,
-                'price_unit': importe
-            })]
-        })
-
-        move.write({'name': numero_factura})
-        move.action_post()
-
-        if 'Pagado' in estado_comp:
-            move.action_registrar_pago()
-
-        if self.copiar_pdfs and archivo_pdf and os.path.exists(source_dir):
-            src = os.path.join(source_dir, archivo_pdf)
-            if os.path.exists(src) and os.path.exists(portal_dir):
-                try:
-                    shutil.copy2(src, portal_dir)
-                except Exception:
-                    pass
-
-        log.append(f'{nombre}: factura {numero_factura} - {estado_comp}')
