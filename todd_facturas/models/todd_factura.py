@@ -48,3 +48,47 @@ class ToddFactura(models.Model):
         for r in self:
             r.estado_pago = 'pagado'
         return True
+
+
+class ToddResetData(models.TransientModel):
+    _name = 'todd.reset'
+    _description = 'Limpiar Datos Todd'
+
+    def action_eliminar_todo(self):
+        """Eliminar todas las facturas, usuarios portal y partners todd"""
+        _logger.warning('TODD: Iniciando limpieza de datos')
+
+        # Eliminar facturas
+        self.env.cr.execute("DELETE FROM todd_factura")
+        _logger.warning('TODD: Facturas eliminadas')
+
+        # Eliminar usuarios portal creados por todd (que tienen todd_nro_socio)
+        self.env.cr.execute("""
+            DELETE FROM res_users WHERE id IN (
+                SELECT u.id FROM res_users u
+                JOIN res_partner p ON u.partner_id = p.id
+                WHERE p.todd_nro_socio IS NOT NULL
+            )
+        """)
+        _logger.warning('TODD: Usuarios portal eliminados')
+
+        # Eliminar partners todd
+        self.env.cr.execute("DELETE FROM res_partner WHERE todd_nro_socio IS NOT NULL")
+        _logger.warning('TODD: Partners eliminados')
+
+        # Eliminar registros de importación
+        self.env.cr.execute("DELETE FROM todd_txt_import")
+        _logger.warning('TODD: Registros de importación eliminados')
+
+        self.env.cr.commit()
+        _logger.warning('TODD: Limpieza completada')
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Limpieza Completada',
+                'message': 'Se eliminaron todas las facturas, usuarios y partners de Todd',
+                'type': 'success',
+            }
+        }

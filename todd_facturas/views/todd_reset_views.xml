@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_todd_reset_form" model="ir.ui.view">
+        <field name="name">todd.reset.form</field>
+        <field name="model">todd.reset</field>
+        <field name="arch" type="xml">
+            <form>
+                <group>
+                    <div class="alert alert-warning">
+                        <strong>Atención:</strong> Esta acción eliminará TODOS los datos de Todd:
+                        <ul class="mb-0 mt-2">
+                            <li>Todas las facturas importadas</li>
+                            <li>Todos los usuarios portal creados</li>
+                            <li>Todos los partners con Nro. Socio</li>
+                            <li>Todos los registros de importación TXT</li>
+                        </ul>
+                        <p class="mt-2 mb-0"><strong>Esta acción no se puede deshacer.</strong></p>
+                    </div>
+                </group>
+                <footer>
+                    <button name="action_eliminar_todo" string="Eliminar Todo" type="object" class="btn-danger"/>
+                    <button string="Cancelar" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_todd_reset" model="ir.actions.act_window">
+        <field name="name">Limpiar Datos Todd</field>
+        <field name="res_model">todd.reset</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>
