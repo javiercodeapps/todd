@@ -8,8 +8,6 @@
                 <group>
                     <field name="archivo_txt" filename="archivo_nombre"/>
                     <field name="archivo_nombre" invisible="1"/>
-                    <field name="journal_id"/>
-                    <field name="copiar_pdfs"/>
                 </group>
                 <group invisible="state != 'done'">
                     <field name="total" readonly="1"/>
