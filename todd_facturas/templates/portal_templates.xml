@@ -26,26 +26,26 @@
                             <tr>
                                 <td><t t-esc="f.numero_completo"/></td>
                                 <td>
-                                    <t t-if="f.todd_servicio == 'E'"><span class="rounded px-2 py-1" style="background-color:#FF6B6B;color:#fff;">Energía</span></t>
-                                    <t t-elif="f.todd_servicio == 'A'"><span class="rounded px-2 py-1" style="background-color:#4ECDC4;color:#fff;">Agua</span></t>
-                                    <t t-elif="f.todd_servicio == 'T'"><span class="rounded px-2 py-1" style="background-color:#45B7D1;color:#fff;">Telefonía</span></t>
-                                    <t t-elif="f.todd_servicio == 'I'"><span class="rounded px-2 py-1" style="background-color:#96CEB4;color:#fff;">Internet</span></t>
-                                    <t t-elif="f.todd_servicio == 'S'"><span class="rounded px-2 py-1" style="background-color:#9B59B6;color:#fff;">Sepelio</span></t>
-                                    <t t-elif="f.todd_servicio == 'N'"><span class="rounded px-2 py-1" style="background-color:#F39C12;color:#fff;">Nichos</span></t>
+                                    <t t-if="f.servicio == 'E'"><span class="rounded px-2 py-1" style="background-color:#FF6B6B;color:#fff;">Energía</span></t>
+                                    <t t-elif="f.servicio == 'A'"><span class="rounded px-2 py-1" style="background-color:#4ECDC4;color:#fff;">Agua</span></t>
+                                    <t t-elif="f.servicio == 'T'"><span class="rounded px-2 py-1" style="background-color:#45B7D1;color:#fff;">Telefonía</span></t>
+                                    <t t-elif="f.servicio == 'I'"><span class="rounded px-2 py-1" style="background-color:#96CEB4;color:#fff;">Internet</span></t>
+                                    <t t-elif="f.servicio == 'S'"><span class="rounded px-2 py-1" style="background-color:#9B59B6;color:#fff;">Sepelio</span></t>
+                                    <t t-elif="f.servicio == 'N'"><span class="rounded px-2 py-1" style="background-color:#F39C12;color:#fff;">Nichos</span></t>
                                 </td>
-                                <td><t t-if="f.todd_periodo and len(f.todd_periodo) == 6"><t t-out="f.todd_periodo[4:6]"/>/<t t-out="f.todd_periodo[0:4]"/></t></td>
+                                <td><t t-if="f.periodo and len(f.periodo) == 6"><t t-out="f.periodo[4:6]"/>/<t t-out="f.periodo[0:4]"/></t></td>
                                 <td><t t-esc="f.invoice_date" t-options="{'widget':'date'}"/></td>
                                 <td><t t-esc="f.invoice_date_due" t-options="{'widget':'date'}"/></td>
                                 <td><t t-esc="f.amount_total" t-options="{'widget':'monetary','display_currency':f.currency_id}"/></td>
                                 <td>
-                                    <span t-if="f.todd_estado_pago == 'pagado'" class="badge bg-success">Pagado</span>
+                                    <span t-if="f.estado_pago == 'pagado'" class="badge bg-success">Pagado</span>
                                     <span t-else="" class="badge bg-danger">Adeudado</span>
                                 </td>
                                 <td>
                                     <a t-attf-href="/my/factura/{{f.id}}/pdf" class="btn btn-sm btn-outline-primary" title="PDF">
                                         <i class="fa fa-file-pdf-o"/>
                                     </a>
-                                    <t t-if="f.todd_estado_pago != 'pagado'">
+                                    <t t-if="f.estado_pago != 'pagado'">
                                         <a t-attf-href="/my/factura/{{f.id}}/pago" class="btn btn-sm btn-success" title="Pagar">
                                             <i class="fa fa-credit-card"/> Pagar
                                         </a>
@@ -98,17 +98,17 @@
                                             <tr>
                                                 <td class="fw-bold">Servicio:</td>
                                                 <td>
-                                                    <t t-if="factura.todd_servicio == 'E'"><span class="rounded px-2 py-1" style="background-color:#FF6B6B;color:#fff;">Energía</span></t>
-                                                    <t t-elif="factura.todd_servicio == 'A'"><span class="rounded px-2 py-1" style="background-color:#4ECDC4;color:#fff;">Agua</span></t>
-                                                    <t t-elif="factura.todd_servicio == 'T'"><span class="rounded px-2 py-1" style="background-color:#45B7D1;color:#fff;">Telefonía</span></t>
-                                                    <t t-elif="factura.todd_servicio == 'I'"><span class="rounded px-2 py-1" style="background-color:#96CEB4;color:#fff;">Internet</span></t>
-                                                    <t t-elif="factura.todd_servicio == 'S'"><span class="rounded px-2 py-1" style="background-color:#9B59B6;color:#fff;">Sepelio</span></t>
-                                                    <t t-elif="factura.todd_servicio == 'N'"><span class="rounded px-2 py-1" style="background-color:#F39C12;color:#fff;">Nichos</span></t>
+                                                    <t t-if="factura.servicio == 'E'"><span class="rounded px-2 py-1" style="background-color:#FF6B6B;color:#fff;">Energía</span></t>
+                                                    <t t-elif="factura.servicio == 'A'"><span class="rounded px-2 py-1" style="background-color:#4ECDC4;color:#fff;">Agua</span></t>
+                                                    <t t-elif="factura.servicio == 'T'"><span class="rounded px-2 py-1" style="background-color:#45B7D1;color:#fff;">Telefonía</span></t>
+                                                    <t t-elif="factura.servicio == 'I'"><span class="rounded px-2 py-1" style="background-color:#96CEB4;color:#fff;">Internet</span></t>
+                                                    <t t-elif="factura.servicio == 'S'"><span class="rounded px-2 py-1" style="background-color:#9B59B6;color:#fff;">Sepelio</span></t>
+                                                    <t t-elif="factura.servicio == 'N'"><span class="rounded px-2 py-1" style="background-color:#F39C12;color:#fff;">Nichos</span></t>
                                                 </td>
                                             </tr>
                                             <tr>
                                                 <td class="fw-bold">Período:</td>
-                                                <td><t t-if="factura.todd_periodo and len(factura.todd_periodo) == 6"><t t-out="factura.todd_periodo[4:6]"/>/<t t-out="factura.todd_periodo[0:4]"/></t></td>
+                                                <td><t t-if="factura.periodo and len(factura.periodo) == 6"><t t-out="factura.periodo[4:6]"/>/<t t-out="factura.periodo[0:4]"/></t></td>
                                             </tr>
                                             <tr>
                                                 <td class="fw-bold">Fecha:</td>
@@ -131,7 +131,7 @@
                         </div>
 
                         <!-- Estado de deuda -->
-                        <t t-if="factura.todd_estado_pago == 'pagado'">
+                        <t t-if="factura.estado_pago == 'pagado'">
                             <div class="alert alert-success text-center">
                                 <h4><i class="fa fa-check-circle"/> Factura pagada</h4>
                                 <p class="mb-0">Esta factura ya fue abonada.</p>
