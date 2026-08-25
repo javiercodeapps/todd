@@ -24,7 +24,7 @@
                     <tbody>
                         <t t-foreach="facturas" t-as="f">
                             <tr>
-                                <td><t t-esc="f.name"/></td>
+                                <td><t t-esc="f.numero_completo"/></td>
                                 <td>
                                     <t t-if="f.todd_servicio == 'E'"><span class="rounded px-2 py-1" style="background-color:#FF6B6B;color:#fff;">Energía</span></t>
                                     <t t-elif="f.todd_servicio == 'A'"><span class="rounded px-2 py-1" style="background-color:#4ECDC4;color:#fff;">Agua</span></t>
