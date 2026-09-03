@@ -108,6 +108,14 @@ class ToddFactura(models.Model):
             'todd.provincianet_api_key',
             'u1kRIYc6d9NSSHDsdbczTMChD4qSaQUPbw3M5ijg52GnW2du2m',
         ) or '').strip()
+        _logger.warning(
+            'Provincia NET preorder factura=%s barcode=%s amount=%s payload=%s api_key_len=%s',
+            self.id,
+            payload['payments'][0]['barcode'],
+            payload['payments'][0]['amount'],
+            json.dumps(payload, ensure_ascii=False),
+            len(api_key),
+        )
         try:
             response = requests.post(
                 PROVINCIANET_URL,
@@ -115,9 +123,21 @@ class ToddFactura(models.Model):
                 data=json.dumps(payload),
                 timeout=30,
             )
-            data = response.json()
-            url = (data.get('data') or {}).get('url') or ''
-            return url.replace('\\', '') or False
+            body = (response.text or '')[:2000]
+            _logger.warning(
+                'Provincia NET response factura=%s status=%s body=%s',
+                self.id, response.status_code, body,
+            )
+            try:
+                data = response.json()
+            except ValueError:
+                _logger.error('Provincia NET respuesta no JSON para factura %s', self.id)
+                return False
+            url = ((data.get('data') or {}).get('url') or '').replace('\\', '')
+            if not url:
+                _logger.error('Provincia NET sin url para factura %s data=%s', self.id, data)
+                return False
+            return url
         except Exception:
             _logger.exception('Provincia NET preorder failed for factura %s', self.id)
             return False
