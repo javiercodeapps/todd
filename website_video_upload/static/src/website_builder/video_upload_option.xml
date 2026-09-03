@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="website_video_upload.VideoUploadOption">
+        <BuilderRow label="'Video'">
+            <BuilderButton action="'uploadVideo'" classAction="'btn btn-primary btn-sm'">
+                Upload Video
+            </BuilderButton>
+        </BuilderRow>
+        <BuilderRow label="'Autoplay'">
+            <BuilderSelect>
+                <BuilderButton classAction="''">Off</BuilderButton>
+                <BuilderButton classAction="'s_video_autoplay'">On</BuilderButton>
+            </BuilderSelect>
+        </BuilderRow>
+        <BuilderRow label="'Loop'">
+            <BuilderSelect>
+                <BuilderButton classAction="''">Off</BuilderButton>
+                <BuilderButton classAction="'s_video_loop'">On</BuilderButton>
+            </BuilderSelect>
+        </BuilderRow>
+        <BuilderRow label="'Controls'">
+            <BuilderSelect>
+                <BuilderButton classAction="''">Show</BuilderButton>
+                <BuilderButton classAction="'s_video_no_controls'">Hide</BuilderButton>
+            </BuilderSelect>
+        </BuilderRow>
+    </t>
+
+</templates>
