@@ -35,7 +35,7 @@ class ToddPortal(http.Controller):
         return request.render('todd_facturas.portal_facturas', values)
 
     @http.route('/my/factura/<int:factura_id>/pago', type='http', auth='user', website=True)
-    def factura_pago(self, factura_id, **kw):
+    def factura_pago(self, factura_id, error=None, **kw):
         partner = request.env.user.partner_id
         factura = request.env['todd.factura'].sudo().search([
             ('id', '=', factura_id),
@@ -53,8 +53,25 @@ class ToddPortal(http.Controller):
             'factura': factura,
             'dias_deuda': dias_deuda,
             'mas_90_dias': mas_90_dias,
+            'error_provincianet': error == 'provincianet',
         }
         return request.render('todd_facturas.portal_pago', values)
+
+    @http.route('/my/factura/<int:factura_id>/provincianet', type='http', auth='user', website=True)
+    def factura_provincianet(self, factura_id, **kw):
+        partner = request.env.user.partner_id
+        factura = request.env['todd.factura'].sudo().search([
+            ('id', '=', factura_id),
+            ('partner_id', '=', partner.id),
+        ], limit=1)
+
+        if not factura or factura.estado_pago == 'pagado':
+            return request.redirect('/my/facturas')
+
+        url = factura.generar_url_provincianet()
+        if not url:
+            return request.redirect(f'/my/factura/{factura.id}/pago?error=provincianet')
+        return request.redirect(url, local=False)
 
     @http.route('/my/factura/<int:factura_id>/pdf', type='http', auth='user', website=True)
     def factura_pdf(self, factura_id, **kw):

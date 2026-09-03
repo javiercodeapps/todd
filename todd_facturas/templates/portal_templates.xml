@@ -166,8 +166,108 @@
                                 <div class="card-body">
                                     <p class="fs-5">Su factura tiene <strong><t t-out="dias_deuda"/></strong> días de antigüedad.</p>
                                     <p>Seleccione una opción de pago:</p>
+                                    <t t-if="error_provincianet">
+                                        <div class="alert alert-danger">No se pudo generar el link de pago de Provincia NET. Intente nuevamente o use otra forma de pago.</div>
+                                    </t>
 
                                     <div class="row g-3 mt-3">
+                                        <!-- Provincia NET -->
+                                        <div class="col-12">
+                                            <div class="card border-primary">
+                                                <div class="card-body text-center">
+                                                    <i class="fa fa-credit-card fa-3x text-primary mb-3"/>
+                                                    <h5>Provincia NET</h5>
+                                                    <p class="text-muted">Pague online con tarjeta o medios de Provincia NET</p>
+                                                    <a t-attf-href="/my/factura/{{factura.id}}/provincianet" class="btn btn-primary btn-lg">
+                                                        <i class="fa fa-external-link"/> Pagar ahora
+                                                    </a>
+                                                </div>
+                                        </div>
+                                    </div>
+
+                                        <t t-set="codigo_billetera" t-value="factura.cod_pago_electronico or factura.cod_pago_electronico_otros"/>
+                                        <div class="col-12" t-if="codigo_billetera">
+                                            <div class="card">
+                                                <div class="card-body">
+                                                    <div class="row align-items-center">
+                                                        <div class="col-md-6">
+                                                            <div class="text-center text-md-start">
+                                                                <i class="fa fa-qrcode fa-3x text-info mb-3"/>
+                                                                <h5>Billeteras Virtuales</h5>
+                                                                <p class="text-muted">Mercado Pago y otras billeteras</p>
+                                                                <ul class="text-start">
+                                                                    <li>Ingresar en cuenta y servicios / Pago de servicios</li>
+                                                                    <li>Pagar una nueva cuenta</li>
+                                                                    <li>Escanee o copie el código de barras que se muestra a continuación o el que figura en la factura</li>
+                                                                </ul>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-6 text-center">
+                                                            <img t-att-src="'/report/barcode/Code128/%s?width=400&amp;height=80&amp;quiet=0' % codigo_billetera"
+                                                                 class="img-fluid mb-2" alt="Código de barras"/>
+                                                            <div class="d-flex align-items-center justify-content-center gap-2 flex-wrap">
+                                                                <span class="font-monospace" id="codigo_billetera" t-esc="codigo_billetera"/>
+                                                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                                        onclick="navigator.clipboard.writeText(document.getElementById('codigo_billetera').innerText)">
+                                                                    <i class="fa fa-copy"/> Copiar
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-12" t-if="factura.nro_usuario">
+                                            <div class="card">
+                                                <div class="card-body">
+                                                    <div class="row align-items-center">
+                                                        <div class="col-md-6">
+                                                            <div class="text-center text-md-start">
+                                                                <i class="fa fa-id-card-o fa-3x text-warning mb-3"/>
+                                                                <h5>Cuenta DNI</h5>
+                                                                <p class="text-muted">Pago de servicios desde la app</p>
+                                                                <ul class="text-start">
+                                                                    <li>Ingresar en pagar servicios</li>
+                                                                    <li>Elegí servicios y pagos → adherir servicio</li>
+                                                                    <li>Ente: Coop Electr. de Todd-internet y telecomunicaciones (podés buscar con "Todd")</li>
+                                                                    <li>Luego ingresar el siguiente código Link</li>
+                                                                </ul>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-6 text-center">
+                                                            <div class="d-flex align-items-center justify-content-center gap-2 flex-wrap mb-3">
+                                                                <span class="fs-3 font-monospace" id="codigo_dni" t-esc="factura.nro_usuario"/>
+                                                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                                        onclick="navigator.clipboard.writeText(document.getElementById('codigo_dni').innerText)">
+                                                                    <i class="fa fa-copy"/> Copiar
+                                                                </button>
+                                                            </div>
+                                                            <p class="text-muted small mb-0">NOTA: En agenda de pagos van a ver los pendientes, lo cual no significa que lo deban. En servicio y pagos le mostrará los comprobantes pagos por este medio.</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-12" t-if="factura.nro_usuario">
+                                            <div class="card">
+                                                <div class="card-body text-center">
+                                                    <i class="fa fa-link fa-3x text-primary mb-3"/>
+                                                    <h5>Pagos Link</h5>
+                                                    <p class="text-muted">Home banking Credicoop, BIP y otros bancos de la red Link</p>
+                                                    <p class="mb-2"><strong>Cód. LINK PAGO</strong></p>
+                                                    <div class="d-flex align-items-center justify-content-center gap-2 flex-wrap">
+                                                        <span class="fs-3 font-monospace" id="codigo_link" t-esc="factura.nro_usuario"/>
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                                onclick="navigator.clipboard.writeText(document.getElementById('codigo_link').innerText)">
+                                                            <i class="fa fa-copy"/> Copiar
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
                                         <!-- Transferencia -->
                                         <div class="col-md-6">
                                             <div class="card h-100">
