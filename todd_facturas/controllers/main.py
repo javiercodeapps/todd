@@ -1,6 +1,7 @@
 import os
 import mimetypes
 from datetime import date, timedelta
+from urllib.parse import quote_plus
 from odoo import http
 from odoo.http import request, content_disposition
 
@@ -35,7 +36,7 @@ class ToddPortal(http.Controller):
         return request.render('todd_facturas.portal_facturas', values)
 
     @http.route('/my/factura/<int:factura_id>/pago', type='http', auth='user', website=True)
-    def factura_pago(self, factura_id, error=None, **kw):
+    def factura_pago(self, factura_id, error=None, error_msg=None, **kw):
         partner = request.env.user.partner_id
         factura = request.env['todd.factura'].sudo().search([
             ('id', '=', factura_id),
@@ -54,6 +55,7 @@ class ToddPortal(http.Controller):
             'dias_deuda': dias_deuda,
             'mas_90_dias': mas_90_dias,
             'error_provincianet': error == 'provincianet',
+            'error_provincianet_msg': error_msg or '',
         }
         return request.render('todd_facturas.portal_pago', values)
 
@@ -68,9 +70,12 @@ class ToddPortal(http.Controller):
         if not factura or factura.estado_pago == 'pagado':
             return request.redirect('/my/facturas')
 
-        url = factura.generar_url_provincianet()
+        url, error_msg = factura.generar_url_provincianet()
         if not url:
-            return request.redirect(f'/my/factura/{factura.id}/pago?error=provincianet')
+            redirect = f'/my/factura/{factura.id}/pago?error=provincianet'
+            if error_msg:
+                redirect += f'&error_msg={quote_plus(error_msg)}'
+            return request.redirect(redirect)
         return request.redirect(url, local=False)
 
     @http.route('/my/factura/<int:factura_id>/pdf', type='http', auth='user', website=True)

@@ -167,7 +167,10 @@
                                     <p class="fs-5">Su factura tiene <strong><t t-out="dias_deuda"/></strong> días de antigüedad.</p>
                                     <p>Seleccione una opción de pago:</p>
                                     <t t-if="error_provincianet">
-                                        <div class="alert alert-danger">No se pudo generar el link de pago de Provincia NET. Intente nuevamente o use otra forma de pago.</div>
+                                        <div class="alert alert-danger">
+                                            <t t-esc="error_provincianet_msg or 'No se pudo generar el link de pago de Provincia NET.'"/>
+                                            Intente nuevamente o use otra forma de pago.
+                                        </div>
                                     </t>
 
                                     <div class="row g-3 mt-3">

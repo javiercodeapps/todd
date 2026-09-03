@@ -132,15 +132,30 @@ class ToddFactura(models.Model):
                 data = response.json()
             except ValueError:
                 _logger.error('Provincia NET respuesta no JSON para factura %s', self.id)
-                return False
-            url = ((data.get('data') or {}).get('url') or '').replace('\\', '')
+                return False, 'No se pudo generar el link de pago de Provincia NET.'
+            url, error_msg = self._provincianet_parse_response(data)
             if not url:
                 _logger.error('Provincia NET sin url para factura %s data=%s', self.id, data)
-                return False
-            return url
+                return False, error_msg
+            return url, False
         except Exception:
             _logger.exception('Provincia NET preorder failed for factura %s', self.id)
-            return False
+            return False, 'No se pudo conectar con Provincia NET. Intente nuevamente.'
+
+    def _provincianet_parse_response(self, data):
+        inner = data.get('data') if isinstance(data, dict) else None
+        if isinstance(inner, dict):
+            url = (inner.get('url') or '').replace('\\', '')
+            if url:
+                return url, False
+            if inner.get('error'):
+                return False, inner['error']
+        elif isinstance(inner, str) and inner:
+            return False, inner
+        message = data.get('message') if isinstance(data, dict) else None
+        if message and message not in ('Unprocessable Entity', 'Unauthorized', 'Forbidden'):
+            return False, message
+        return False, 'No se pudo generar el link de pago de Provincia NET.'
 
 
 class ToddResetData(models.TransientModel):
