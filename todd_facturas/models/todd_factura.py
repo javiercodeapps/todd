@@ -104,10 +104,10 @@ class ToddFactura(models.Model):
                 'detail': f'{periodo_fmt} {servicio_nombre} {self.domicilio or ""}'.strip(),
             }],
         }
-        api_key = self.env['ir.config_parameter'].sudo().get_param(
+        api_key = (self.env['ir.config_parameter'].sudo().get_param(
             'todd.provincianet_api_key',
             'u1kRIYc6d9NSSHDsdbczTMChD4qSaQUPbw3M5ijg52GnW2du2m',
-        )
+        ) or '').strip()
         try:
             response = requests.post(
                 PROVINCIANET_URL,
