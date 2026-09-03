@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <menuitem id="menu_todd_root" name="Todd Facturas" sequence="100"/>
+    <menuitem id="menu_todd_root" name="Todd Facturas" sequence="100" web_icon="todd_facturas,static/description/icon.png"/>
 
     <menuitem id="menu_todd_facturas" name="Facturas" parent="menu_todd_root" sequence="10"/>
     <menuitem id="menu_todd_list" name="Listado" parent="menu_todd_facturas" action="action_todd_factura" sequence="10"/>
