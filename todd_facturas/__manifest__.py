@@ -1,6 +1,6 @@
 {
     'name': "Todd Facturas",
-    'version': '19.0.1.0.1',
+    'version': '19.0.1.1.0',
     'depends': ['base', 'portal'],
     'author': "Todd",
     'category': 'Accounting',

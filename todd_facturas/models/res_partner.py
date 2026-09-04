@@ -1,4 +1,12 @@
+import logging
+
+import requests
+
 from odoo import models, fields, api
+
+_logger = logging.getLogger(__name__)
+
+RADIUS_URL = 'https://radius-gestion.todd.com.ar/radius/numero_cliente/index'
 
 
 class ResPartner(models.Model):
@@ -114,3 +122,111 @@ class ResPartner(models.Model):
                     (user.id,)
                 )
         return True
+
+    @api.model
+    def _todd_variantes_numero(self, numero):
+        n = (numero or '').strip()
+        if not n:
+            return []
+        variantes = {n}
+        sin_ceros = n.lstrip('0') or '0'
+        variantes.add(sin_ceros)
+        if n.isdigit():
+            variantes.add(n.zfill(8))
+            variantes.add(sin_ceros.zfill(8))
+        return list(variantes)
+
+    @api.model
+    def todd_buscar_por_numero(self, numero):
+        variantes = self._todd_variantes_numero(numero)
+        if not variantes:
+            return self.browse()
+        partner = self.search([
+            '|', '|',
+            ('todd_nro_socio', 'in', variantes),
+            ('todd_nro_usuario', 'in', variantes),
+            ('vat', 'in', variantes),
+        ], limit=1)
+        if partner:
+            return partner
+        factura = self.env['todd.factura'].search([
+            '|', '|',
+            ('dni', 'in', variantes),
+            ('nro_usuario', 'in', variantes),
+            ('referencia', 'in', variantes),
+        ], limit=1)
+        return factura.partner_id
+
+    @api.model
+    def _todd_consultar_radius(self, numero_cliente):
+        config = self.env['ir.config_parameter'].sudo()
+        api_key = (config.get_param('todd.radius_api_key') or '').strip()
+        base = (config.get_param('todd.radius_url', RADIUS_URL) or RADIUS_URL).strip().rstrip('/')
+        if not api_key:
+            return False, 'API key de Radius no configurada'
+        if not numero_cliente:
+            return False, 'Sin número de cliente para Radius'
+        try:
+            response = requests.get(
+                f'{base}/{numero_cliente}',
+                headers={'X-Api-Key': api_key, 'Accept': 'application/json'},
+                params={'apikey': api_key},
+                timeout=15,
+            )
+            try:
+                data = response.json()
+            except ValueError:
+                _logger.warning(
+                    'Radius respuesta no JSON status=%s body=%s',
+                    response.status_code, (response.text or '')[:500],
+                )
+                return False, f'Radius status {response.status_code}'
+            if response.status_code >= 400:
+                error = data.get('error') or data.get('message') or f'Radius status {response.status_code}'
+                return data, error
+            return data, False
+        except Exception:
+            _logger.exception('Radius consulta falló para %s', numero_cliente)
+            return False, 'No se pudo conectar con Radius'
+
+    @api.model
+    def todd_api_estado_cliente(self, numero, limit=20):
+        try:
+            limit = max(1, min(int(limit or 20), 50))
+        except (TypeError, ValueError):
+            limit = 20
+        partner = self.todd_buscar_por_numero(numero)
+        if not partner:
+            return False
+        facturas = self.env['todd.factura'].search(
+            [('partner_id', '=', partner.id)],
+            order='fecha_emision desc, id desc',
+            limit=limit,
+        )
+        seleccion = dict(self.env['todd.factura']._fields['servicio'].selection)
+        radius, radius_error = self._todd_consultar_radius(partner.todd_nro_socio or numero)
+        return {
+            'partner': {
+                'id': partner.id,
+                'name': partner.name,
+                'vat': partner.vat or False,
+                'nro_socio': partner.todd_nro_socio or False,
+                'nro_usuario': partner.todd_nro_usuario or False,
+            },
+            'facturas': [{
+                'id': f.id,
+                'numero': f.numero_completo,
+                'servicio': f.servicio,
+                'servicio_nombre': seleccion.get(f.servicio, f.servicio),
+                'periodo': f.periodo,
+                'fecha_emision': f.fecha_emision.isoformat() if f.fecha_emision else False,
+                'fecha_vencimiento': f.fecha_vencimiento.isoformat() if f.fecha_vencimiento else False,
+                'importe': f.importe,
+                'importe_2do_vencimiento': f.importe_2do_vencimiento,
+                'estado_pago': f.estado_pago,
+                'domicilio': f.domicilio,
+                'nro_usuario': f.nro_usuario,
+            } for f in facturas],
+            'radius': radius,
+            'radius_error': radius_error,
+        }
