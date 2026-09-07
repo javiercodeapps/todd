@@ -12,8 +12,10 @@
                 <group invisible="state != 'done'">
                     <field name="total" readonly="1"/>
                     <field name="ok" readonly="1"/>
+                    <field name="actualizadas" readonly="1"/>
+                    <field name="omitidas" readonly="1"/>
                     <field name="errores" readonly="1"/>
-                    <field name="log" readonly="1" nolabel="1"/>
+                    <field name="log" readonly="1" nolabel="1" widget="text"/>
                 </group>
                 <footer>
                     <button name="action_importar" string="Importar" type="object" class="btn-primary" invisible="state != 'draft'"/>

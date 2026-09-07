@@ -1,5 +1,4 @@
 import os
-import shutil
 import logging
 from datetime import datetime
 from odoo import models, fields, api
@@ -26,6 +25,7 @@ class ToddTxtImport(models.Model):
     fecha_importacion = fields.Datetime(string='Fecha Importación', readonly=True)
     total_lineas = fields.Integer(string='Total Líneas', readonly=True)
     lineas_procesadas = fields.Integer(string='Líneas Procesadas', readonly=True)
+    lineas_omitidas = fields.Integer(string='Líneas Omitidas', readonly=True)
     facturas_creadas = fields.Integer(string='Facturas Creadas', readonly=True)
     facturas_actualizadas = fields.Integer(string='Facturas Actualizadas', readonly=True)
     partners_creados = fields.Integer(string='Partners Creados', readonly=True)
@@ -39,204 +39,282 @@ class ToddTxtImport(models.Model):
         return config.get_param('todd.txt_dir', '/var/logs/data/txts')
 
     @api.model
+    def _get_pdf_dir(self):
+        config = self.env['ir.config_parameter'].sudo()
+        return config.get_param('todd.pdf_source_dir', '/var/log/odoo/data/facturas')
+
+    @api.model
     def action_escanear_archivos(self):
         txt_dir = self._get_txt_dir()
-        _logger.warning(f'TODD: Escaneando directorio {txt_dir}')
+        _logger.info('TODD: Escaneando directorio %s', txt_dir)
         if not os.path.exists(txt_dir):
-            _logger.warning(f'TODD: Directorio TXT no existe: {txt_dir}')
+            _logger.warning('TODD: Directorio TXT no existe: %s', txt_dir)
             return 0
 
-        archivos_existentes = self.search([('filename', 'in', os.listdir(txt_dir))]).mapped('filename')
+        archivos_existentes = set(self.search([]).mapped('filename'))
         nuevos = 0
         for filename in sorted(os.listdir(txt_dir)):
             if not filename.endswith('.txt') or filename in archivos_existentes:
                 continue
             filepath = os.path.join(txt_dir, filename)
             fecha = datetime.fromtimestamp(os.path.getmtime(filepath))
-            self.create({'filename': filename, 'filepath': filepath, 'fecha_archivo': fecha, 'state': 'pending'})
+            self.create({
+                'filename': filename,
+                'filepath': filepath,
+                'fecha_archivo': fecha,
+                'state': 'pending',
+            })
             nuevos += 1
-            _logger.warning(f'TODD: Nuevo archivo detectado: {filename}')
+            _logger.info('TODD: Nuevo archivo detectado: %s', filename)
 
-        _logger.warning(f'TODD: Escaneo completado - {nuevos} archivos nuevos')
+        _logger.info('TODD: Escaneo completado - %s archivos nuevos', nuevos)
         return nuevos
 
     def action_escanear_y_procesar(self):
         self.action_escanear_archivos()
-        pendiente = self.search([('state', '=', 'pending')], order='fecha_archivo asc', limit=1)
+        pendiente = self.search(
+            [('state', 'in', ('pending', 'processing'))],
+            order='fecha_archivo asc',
+            limit=1,
+        )
         if pendiente:
             pendiente.action_procesar()
 
     @api.model
     def _procesar_pendientes(self):
         self.action_escanear_archivos()
-        pendientes = self.search([('state', '=', 'pending')], order='fecha_archivo asc', limit=1)
-        if pendientes:
-            pendientes.action_procesar()
+        pendiente = self.search(
+            [('state', 'in', ('pending', 'processing'))],
+            order='fecha_archivo asc',
+            limit=1,
+        )
+        if pendiente:
+            pendiente.action_procesar()
+
+    @api.model
+    def _parse_linea_txt(self, linea, line_num):
+        c = [x.strip() for x in linea.split(';')]
+        if len(c) < 17:
+            return None
+        return {
+            'nro_socio': c[0],
+            'nro_usuario': c[1],
+            'periodo': c[2],
+            'pto_venta': int(c[3]),
+            'nro_fac': int(c[4]),
+            'fecha_fac': datetime.strptime(c[5], '%d/%m/%Y').date(),
+            'fecha_vto': datetime.strptime(c[6], '%d/%m/%Y').date(),
+            'importe': float(c[7].replace(',', '.')),
+            'archivo_pdf': c[8],
+            'cod_pago_electronico': c[9].strip(),
+            'cod_pago_electronico_otros': c[10].strip(),
+            'estado_comp': c[11].strip(),
+            'domicilio': c[12],
+            'nombre': c[13],
+            'servicio': c[14],
+            'importe_2do_venc': float(c[15].replace(',', '.')) if c[15].strip() else 0,
+            'dni': c[17].strip() if len(c) > 17 else '',
+            'line_num': line_num,
+        }
+
+    @api.model
+    def _get_or_create_partner_todd(self, lp):
+        partner = self.env['res.partner'].search(
+            [('todd_nro_socio', '=', lp['nro_socio'])], limit=1
+        )
+        created = False
+        if not partner:
+            dni = lp['dni']
+            partner = self.env['res.partner'].create({
+                'name': lp['nombre'],
+                'todd_nro_socio': lp['nro_socio'],
+                'todd_nro_usuario': lp['nro_usuario'],
+                'street': lp['domicilio'],
+                'vat': dni if dni and dni != '0' else False,
+            })
+            created = True
+        partner.crear_usuario_portal_si_no_tiene()
+        return partner, created
+
+    @api.model
+    def _crear_o_actualizar_factura(self, lp, source_dir):
+        existe = self.env['todd.factura'].search([
+            ('partner_id', '=', lp['partner_id']),
+            ('archivo_pdf', '=', lp['archivo_pdf']),
+        ], limit=1)
+        if existe:
+            if 'Pagado' in lp['estado_comp'] and existe.estado_pago != 'pagado':
+                existe.estado_pago = 'pagado'
+                return 'updated', None
+            return 'skipped', None
+
+        src = os.path.join(source_dir, lp['archivo_pdf']) if lp['archivo_pdf'] else ''
+        pdf_ok = bool(src and os.path.exists(src))
+        warning = None if pdf_ok else f"PDF no encontrado: {lp['archivo_pdf']}"
+
+        self.env['todd.factura'].create({
+            'partner_id': lp['partner_id'],
+            'referencia': lp['nro_socio'],
+            'nro_usuario': lp['nro_usuario'],
+            'periodo': lp['periodo'],
+            'punto_venta': lp['pto_venta'],
+            'nro_factura': lp['nro_fac'],
+            'fecha_emision': lp['fecha_fac'],
+            'fecha_vencimiento': lp['fecha_vto'],
+            'importe': lp['importe'],
+            'archivo_pdf': lp['archivo_pdf'],
+            'cod_pago_electronico': lp['cod_pago_electronico'],
+            'cod_pago_electronico_otros': lp['cod_pago_electronico_otros'],
+            'estado_pago': 'pagado' if 'Pagado' in lp['estado_comp'] else 'adeudado',
+            'domicilio': lp['domicilio'],
+            'servicio': lp['servicio'],
+            'importe_2do_vencimiento': lp['importe_2do_venc'],
+            'dni': lp['dni'],
+            'archivo_pdf_ruta': src if pdf_ok else '',
+        })
+        return 'created', warning
+
+    def _append_log(self, lines):
+        prev = self.log or ''
+        extra = '\n'.join(lines)
+        combined = '\n'.join(x for x in (prev, extra) if x)
+        if len(combined) > 80000:
+            combined = combined[-80000:]
+        return combined
 
     def action_procesar(self):
         self.ensure_one()
-        if self.state not in ('pending',):
+        if self.state not in ('pending', 'processing', 'error'):
             return
 
-        _logger.warning(f'TODD: Iniciando carga de {self.filename}')
-        self.write({'state': 'processing', 'fecha_importacion': fields.Datetime.now()})
+        _logger.info('TODD: Iniciando carga de %s (state=%s, offset=%s)',
+                     self.filename, self.state, self.lineas_procesadas)
+        if self.state != 'processing':
+            self.write({
+                'state': 'processing',
+                'fecha_importacion': fields.Datetime.now(),
+            })
+            self.env.cr.commit()
 
         try:
             with open(self.filepath, 'r', encoding='latin-1') as f:
                 lineas = f.readlines()
         except Exception as e:
-            self.write({'state': 'error', 'log': f'Error leyendo: {e}'})
+            msg = f'Error leyendo archivo: {e}'
+            _logger.exception('TODD: %s', msg)
+            self.write({'state': 'error', 'log': self._append_log([msg])})
             return
 
         if len(lineas) < 2:
-            self.write({'state': 'error', 'log': 'Archivo vacío'})
+            msg = 'Archivo vacío o sin líneas de datos'
+            self.write({'state': 'error', 'log': self._append_log([msg])})
             return
 
         total = len(lineas) - 1
-        offset = self.lineas_procesadas or 0
-        _logger.warning(f'TODD: {self.filename} - Total: {total}, desde línea {offset + 1}')
+        source_dir = self._get_pdf_dir()
+        import_id = self.id
 
-        config = self.env['ir.config_parameter'].sudo()
-        source_dir = config.get_param('todd.pdf_source_dir', '/var/log/odoo/data/facturas')
-        portal_dir = config.get_param('todd.pdf_portal_dir', '/var/log/odoo/data/facturas_web')
-        if not os.path.exists(portal_dir):
-            try: os.makedirs(portal_dir)
-            except: pass
+        try:
+            while True:
+                self = self.env['todd.txt.import'].browse(import_id)
+                offset = self.lineas_procesadas or 0
+                start = offset + 1
+                end = min(start + BATCH_SIZE, len(lineas))
+                if start >= len(lineas):
+                    self.write({
+                        'state': 'done',
+                        'total_lineas': total,
+                        'log': self._append_log([
+                            f'Finalizado {self.filename}: {self.facturas_creadas} creadas, '
+                            f'{self.facturas_actualizadas} actualizadas, {self.errores} errores, '
+                            f'{self.lineas_omitidas} omitidas'
+                        ]),
+                    })
+                    break
 
-        log = []
-        creadas = self.facturas_creadas or 0
-        actualizadas = self.facturas_actualizadas or 0
-        partners_nuevos = self.partners_creados or 0
-        usuarios_nuevos = self.usuarios_creados or 0
-        errores = self.errores or 0
+                log = [f'--- Lote líneas {start}-{end - 1} de {total} ---']
+                creadas = actualizadas = partners_nuevos = omitidas = errores = 0
+                partners_map = {}
+                lineas_parseadas = []
 
-        fin = min(offset + BATCH_SIZE, total)
+                for i in range(start, end):
+                    try:
+                        parsed = self._parse_linea_txt(lineas[i], i + 1)
+                        if not parsed:
+                            omitidas += 1
+                            cols = len([x for x in lineas[i].split(';')])
+                            log.append(f'Línea {i + 1}: omitida (columnas insuficientes: {cols})')
+                            continue
+                        if parsed['nro_socio'] not in partners_map:
+                            try:
+                                with self.env.cr.savepoint():
+                                    partner, created = self._get_or_create_partner_todd(parsed)
+                                    partners_map[parsed['nro_socio']] = partner.id
+                                    if created:
+                                        partners_nuevos += 1
+                            except Exception as e:
+                                errores += 1
+                                log.append(f"Línea {i + 1}: ERROR partner {parsed['nro_socio']} - {e}")
+                                _logger.exception('TODD: partner línea %s de %s', i + 1, self.filename)
+                                continue
+                        parsed['partner_id'] = partners_map[parsed['nro_socio']]
+                        lineas_parseadas.append(parsed)
+                    except Exception as e:
+                        errores += 1
+                        log.append(f'Línea {i + 1}: ERROR parseo - {e}')
+                        _logger.exception('TODD: parseo línea %s de %s', i + 1, self.filename)
 
-        # PASADA 1: Parsear y crear partners
-        _logger.warning(f'TODD: {self.filename} - Pasada 1: partners ({offset + 1}-{fin})')
-        partners_map = {}
-        lineas_parseadas = []
+                for lp in lineas_parseadas:
+                    try:
+                        with self.env.cr.savepoint():
+                            status, warning = self._crear_o_actualizar_factura(lp, source_dir)
+                        if status == 'created':
+                            creadas += 1
+                        elif status == 'updated':
+                            actualizadas += 1
+                        if warning:
+                            log.append(f"Línea {lp['line_num']}: {warning}")
+                    except Exception as e:
+                        errores += 1
+                        log.append(f"Línea {lp['line_num']}: ERROR factura - {e}")
+                        _logger.exception('TODD: factura línea %s de %s', lp['line_num'], self.filename)
 
-        for i in range(offset + 1, fin):
-            linea = lineas[i]
-            try:
-                c = [x.strip() for x in linea.split(';')]
-                if len(c) < 17:
-                    continue
-
-                nro_socio = c[0]
-                nro_usuario = c[1]
-                nombre = c[13]
-                domicilio = c[12]
-                dni = c[17].strip() if len(c) > 17 else ''
-
-                if nro_socio not in partners_map:
-                    partner = self.env['res.partner'].search([('todd_nro_socio', '=', nro_socio)], limit=1)
-                    if not partner:
-                        partner = self.env['res.partner'].create({
-                            'name': nombre, 'todd_nro_socio': nro_socio, 'todd_nro_usuario': nro_usuario,
-                            'street': domicilio, 'vat': dni if dni and dni != '0' else False
-                        })
-                        partners_nuevos += 1
-                    partner.crear_usuario_portal_si_no_tiene()
-                    partners_map[nro_socio] = partner.id
-
-                lineas_parseadas.append({
-                    'nro_socio': nro_socio,
-                    'nro_usuario': nro_usuario,
-                    'periodo': c[2],
-                    'pto_venta': int(c[3]),
-                    'nro_fac': int(c[4]),
-                    'fecha_fac': datetime.strptime(c[5], '%d/%m/%Y').date(),
-                    'fecha_vto': datetime.strptime(c[6], '%d/%m/%Y').date(),
-                    'importe': float(c[7].replace(',', '.')),
-                    'archivo_pdf': c[8],
-                    'cod_pago_electronico': c[9].strip(),
-                    'cod_pago_electronico_otros': c[10].strip(),
-                    'estado_comp': c[11].strip(),
-                    'domicilio': domicilio,
-                    'servicio': c[14],
-                    'importe_2do_venc': float(c[15].replace(',', '.')) if c[15].strip() else 0,
-                    'dni': dni,
-                    'partner_id': partners_map[nro_socio],
-                    'line_num': i + 1,
-                })
-            except Exception as e:
-                errores += 1
-                log.append(f'Línea {i + 1}: ERROR - {e}')
-                self.env.cr.rollback()
-
-        _logger.warning(f'TODD: {self.filename} - Pasada 1: {len(partners_map)} partners ({partners_nuevos} nuevos)')
-
-        # PASADA 2: Crear facturas via SQL
-        _logger.warning(f'TODD: {self.filename} - Pasada 2: facturas')
-        for lp in lineas_parseadas:
-            try:
-                # Verificar duplicada
-                self.env.cr.execute(
-                    "SELECT id FROM todd_factura WHERE partner_id=%s AND archivo_pdf=%s LIMIT 1",
-                    (lp['partner_id'], lp['archivo_pdf'])
-                )
-                if self.env.cr.fetchone():
-                    if 'Pagado' in lp['estado_comp']:
-                        self.env.cr.execute(
-                            "UPDATE todd_factura SET estado_pago='pagado' WHERE partner_id=%s AND archivo_pdf=%s AND estado_pago != 'pagado'",
-                            (lp['partner_id'], lp['archivo_pdf'])
-                        )
-                        actualizadas += 1
-                    continue
-
-                # Copiar PDF
-                pdf_ruta = ''
-                if os.path.exists(source_dir) and os.path.exists(portal_dir):
-                    src = os.path.join(source_dir, lp['archivo_pdf'])
-                    if os.path.exists(src):
-                        dst = os.path.join(portal_dir, lp['archivo_pdf'])
-                        try:
-                            shutil.copy2(src, dst)
-                            pdf_ruta = dst
-                        except: pass
-
-                estado_pago = 'pagado' if 'Pagado' in lp['estado_comp'] else 'adeudado'
-
-                self.env.cr.execute(
-                    """INSERT INTO todd_factura (partner_id, referencia, nro_usuario, periodo, punto_venta, nro_factura,
-                       numero_completo, fecha_emision, fecha_vencimiento, importe, archivo_pdf, cod_pago_electronico,
-                       cod_pago_electronico_otros, estado_pago, domicilio, servicio, importe_2do_vencimiento, dni,
-                       archivo_pdf_ruta)
-                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                    (lp['partner_id'], lp['nro_socio'], lp['nro_usuario'], lp['periodo'],
-                     lp['pto_venta'], lp['nro_fac'],
-                     f"{lp['pto_venta']:04d}-{lp['nro_fac']:08d}",
-                     lp['fecha_fac'], lp['fecha_vto'], lp['importe'], lp['archivo_pdf'],
-                     lp['cod_pago_electronico'], lp['cod_pago_electronico_otros'],
-                     estado_pago, lp['domicilio'], lp['servicio'], lp['importe_2do_venc'],
-                     lp['dni'], pdf_ruta)
-                )
-
-                creadas += 1
-            except Exception as e:
-                errores += 1
-                log.append(f'Línea {lp["line_num"]}: ERROR - {e}')
-                self.env.cr.rollback()
-
-        _logger.warning(f'TODD: {self.filename} - Batch {offset + 1}-{fin}/{total} ({creadas} creadas)')
-
-        self.env.cr.commit()
-
-        self.write({
-            'total_lineas': total,
-            'lineas_procesadas': fin,
-            'facturas_creadas': creadas,
-            'facturas_actualizadas': actualizadas,
-            'partners_creados': partners_nuevos,
-            'usuarios_creados': usuarios_nuevos,
-            'errores': errores,
-            'log': '\n'.join(log[-50:])
-        })
-
-        if fin >= total:
-            self.write({'state': 'done'})
-            _logger.warning(f'TODD: Finalizado {self.filename} - Creadas: {creadas}, Partners: {partners_nuevos}, Errores: {errores}')
-        else:
-            _logger.warning(f'TODD: {self.filename} pendiente - quedan {total - fin} líneas')
+                vals = {
+                    'total_lineas': total,
+                    'lineas_procesadas': end - 1,
+                    'lineas_omitidas': (self.lineas_omitidas or 0) + omitidas,
+                    'facturas_creadas': (self.facturas_creadas or 0) + creadas,
+                    'facturas_actualizadas': (self.facturas_actualizadas or 0) + actualizadas,
+                    'partners_creados': (self.partners_creados or 0) + partners_nuevos,
+                    'errores': (self.errores or 0) + errores,
+                }
+                if end >= len(lineas):
+                    vals['state'] = 'done'
+                    log.append(
+                        f'Finalizado {self.filename}: {vals["facturas_creadas"]} creadas, '
+                        f'{vals["facturas_actualizadas"]} actualizadas, {vals["errores"]} errores, '
+                        f'{vals["lineas_omitidas"]} omitidas'
+                    )
+                    _logger.info(
+                        'TODD: Finalizado %s - Creadas: %s, Actualizadas: %s, Errores: %s, Omitidas: %s',
+                        self.filename, vals['facturas_creadas'], vals['facturas_actualizadas'],
+                        vals['errores'], vals['lineas_omitidas'],
+                    )
+                else:
+                    _logger.info(
+                        'TODD: %s lote %s-%s/%s (creadas +%s, errores +%s)',
+                        self.filename, start, end - 1, total, creadas, errores,
+                    )
+                vals['log'] = self._append_log(log)
+                self.write(vals)
+                self.env.cr.commit()
+                self.env.clear()
+                if end >= len(lineas):
+                    break
+        except Exception as e:
+            _logger.exception('TODD: falla inesperada procesando %s', self.filename)
+            self = self.env['todd.txt.import'].browse(import_id)
+            self.write({
+                'state': 'error',
+                'log': self._append_log([f'ERROR inesperado: {e}']),
+            })

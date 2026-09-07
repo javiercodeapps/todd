@@ -6,7 +6,7 @@ from odoo import models, fields, api
 
 _logger = logging.getLogger(__name__)
 
-RADIUS_URL = 'https://radius-gestion.todd.com.ar/radius/numero_cliente/index'
+RADIUS_URL = 'https://radius-gestion.todd.com.ar/radius/user_info/data'
 
 
 class ResPartner(models.Model):

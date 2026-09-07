@@ -8,6 +8,8 @@
                 <header>
                     <button name="action_procesar" string="Procesar" type="object"
                             class="btn-primary" invisible="state != 'pending'"/>
+                    <button name="action_procesar" string="Reanudar" type="object"
+                            class="btn-primary" invisible="state not in ('processing', 'error')"/>
                     <button name="action_escanear_y_procesar" string="Escanear y Procesar" type="object"
                             class="btn-secondary"/>
                     <field name="state" widget="statusbar"/>
@@ -22,15 +24,16 @@
                         <group string="Resultado">
                             <field name="fecha_importacion"/>
                             <field name="total_lineas"/>
+                            <field name="lineas_procesadas"/>
+                            <field name="lineas_omitidas"/>
                             <field name="facturas_creadas"/>
                             <field name="facturas_actualizadas"/>
                             <field name="partners_creados"/>
-                            <field name="usuarios_creados"/>
                             <field name="errores"/>
                         </group>
                     </group>
-                    <group string="Log" invisible="log == False">
-                        <field name="log" nolabel="1" readonly="1"/>
+                    <group string="Log">
+                        <field name="log" nolabel="1" readonly="1" widget="text"/>
                     </group>
                 </sheet>
             </form>
@@ -45,6 +48,8 @@
                 <field name="filename"/>
                 <field name="fecha_archivo"/>
                 <field name="state"/>
+                <field name="lineas_procesadas"/>
+                <field name="total_lineas"/>
                 <field name="facturas_creadas"/>
                 <field name="facturas_actualizadas"/>
                 <field name="errores"/>
