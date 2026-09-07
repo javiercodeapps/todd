@@ -9,4 +9,20 @@
         <field name="interval_type">hours</field>
         <field name="active">True</field>
     </record>
+
+    <record id="action_todd_cron_import" model="ir.actions.act_window">
+        <field name="name">Actividad programada</field>
+        <field name="res_model">ir.cron</field>
+        <field name="view_mode">form</field>
+        <field name="res_id" ref="ir_cron_todd_import"/>
+        <field name="target">current</field>
+        <field name="context">{'create': False, 'delete': False}</field>
+    </record>
+
+    <menuitem id="menu_todd_cron_import"
+              name="Actividad programada"
+              parent="menu_todd_import"
+              action="action_todd_cron_import"
+              sequence="30"
+              groups="base.group_system"/>
 </odoo>
