@@ -30,8 +30,8 @@ class ToddFactura(models.Model):
     nro_usuario = fields.Char(string='Nro. Usuario')
     periodo = fields.Char(string='Periodo', size=6)
     punto_venta = fields.Integer(string='Punto de Venta')
-    nro_factura = fields.Integer(string='Nro. Factura')
-    numero_completo = fields.Char(string='Número', compute='_compute_numero', store=True)
+    nro_factura = fields.Integer(string='Nro. Factura', index=True)
+    numero_completo = fields.Char(string='Número', compute='_compute_numero', store=True, index=True)
     fecha_emision = fields.Date(string='Fecha Emisión', index=True)
     fecha_vencimiento = fields.Date(string='Fecha Vencimiento')
     importe = fields.Float(string='Importe', digits=(12, 2))
@@ -55,9 +55,10 @@ class ToddFactura(models.Model):
         for r in self:
             r.numero_completo = f'{r.punto_venta:04d}-{r.nro_factura:08d}' if r.punto_venta and r.nro_factura else ''
 
+    @api.depends('archivo_pdf_ruta')
     def _compute_pdf_disponible(self):
         for r in self:
-            r.pdf_disponible = r.archivo_pdf_ruta and os.path.exists(r.archivo_pdf_ruta)
+            r.pdf_disponible = bool(r.archivo_pdf_ruta and os.path.exists(r.archivo_pdf_ruta))
 
     def action_registrar_pago(self):
         for r in self:

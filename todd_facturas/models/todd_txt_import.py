@@ -138,20 +138,32 @@ class ToddTxtImport(models.Model):
         return partner, created
 
     @api.model
-    def _crear_o_actualizar_factura(self, lp, source_dir):
-        existe = self.env['todd.factura'].search([
-            ('partner_id', '=', lp['partner_id']),
-            ('archivo_pdf', '=', lp['archivo_pdf']),
-        ], limit=1)
-        if existe:
-            if 'Pagado' in lp['estado_comp'] and existe.estado_pago != 'pagado':
-                existe.estado_pago = 'pagado'
-                return 'updated', None
-            return 'skipped', None
+    def _pdf_ruta(self, source_dir, archivo_pdf):
+        src = os.path.join(source_dir, archivo_pdf) if archivo_pdf else ''
+        if src and os.path.exists(src):
+            return src, None
+        return '', f'PDF no encontrado: {archivo_pdf or "(vacío)"}'
 
-        src = os.path.join(source_dir, lp['archivo_pdf']) if lp['archivo_pdf'] else ''
-        pdf_ok = bool(src and os.path.exists(src))
-        warning = None if pdf_ok else f"PDF no encontrado: {lp['archivo_pdf']}"
+    @api.model
+    def _crear_o_actualizar_factura(self, lp, source_dir):
+        numero = f"{lp['pto_venta']:04d}-{lp['nro_fac']:08d}"
+        existe = self.env['todd.factura'].search([
+            ('numero_completo', '=', numero),
+        ], limit=1)
+        nuevo_estado = 'pagado' if 'Pagado' in lp['estado_comp'] else 'adeudado'
+        pdf_ruta, warning = self._pdf_ruta(source_dir, lp['archivo_pdf'])
+
+        if existe:
+            vals = {}
+            if existe.estado_pago != nuevo_estado:
+                vals['estado_pago'] = nuevo_estado
+            if pdf_ruta and existe.archivo_pdf_ruta != pdf_ruta:
+                vals['archivo_pdf'] = lp['archivo_pdf']
+                vals['archivo_pdf_ruta'] = pdf_ruta
+            if vals:
+                existe.write(vals)
+                return 'updated', warning
+            return 'skipped', None
 
         self.env['todd.factura'].create({
             'partner_id': lp['partner_id'],
@@ -166,12 +178,12 @@ class ToddTxtImport(models.Model):
             'archivo_pdf': lp['archivo_pdf'],
             'cod_pago_electronico': lp['cod_pago_electronico'],
             'cod_pago_electronico_otros': lp['cod_pago_electronico_otros'],
-            'estado_pago': 'pagado' if 'Pagado' in lp['estado_comp'] else 'adeudado',
+            'estado_pago': nuevo_estado,
             'domicilio': lp['domicilio'],
             'servicio': lp['servicio'],
             'importe_2do_vencimiento': lp['importe_2do_venc'],
             'dni': lp['dni'],
-            'archivo_pdf_ruta': src if pdf_ok else '',
+            'archivo_pdf_ruta': pdf_ruta,
         })
         return 'created', warning
 
