@@ -13,7 +13,6 @@
         'views/todd_factura_views.xml',
         'views/todd_txt_import_views.xml',
         'views/res_partner_views.xml',
-        'views/todd_reset_views.xml',
         'views/todd_menu.xml',
         'data/todd_cron.xml',
         'templates/portal_templates.xml',

@@ -8,7 +8,4 @@
     <menuitem id="menu_todd_import" name="Importación" parent="menu_todd_root" sequence="20"/>
     <menuitem id="menu_todd_import_txt" name="Importar TXT" parent="menu_todd_import" action="action_todd_import_wizard" sequence="10"/>
     <menuitem id="menu_todd_control_txt" name="Control de Imports" parent="menu_todd_import" action="action_todd_txt_import" sequence="20"/>
-
-    <menuitem id="menu_todd_herramientas" name="Herramientas" parent="menu_todd_root" sequence="90"/>
-    <menuitem id="menu_todd_reset" name="Limpiar Datos" parent="menu_todd_herramientas" action="action_todd_reset" sequence="10"/>
 </odoo>

@@ -11,6 +11,7 @@ BATCH_SIZE = 500
 class ToddTxtImport(models.Model):
     _name = 'todd.txt.import'
     _description = 'Importación TXT Todd'
+    _rec_name = 'filename'
     _order = 'create_date desc'
 
     filename = fields.Char(string='Archivo', required=True, readonly=True)
