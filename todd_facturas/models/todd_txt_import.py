@@ -193,6 +193,12 @@ class ToddTxtImport(models.Model):
             combined = combined[-80000:]
         return combined
 
+    def _guardar_progreso(self, vals):
+        self.write(vals)
+        self.env.flush_all()
+        self.env.cr.commit()
+        self.env.invalidate_all()
+
     def _marcar_error(self, msg):
         import_id = self.id
         self.env.cr.rollback()
@@ -210,7 +216,7 @@ class ToddTxtImport(models.Model):
         _logger.info('TODD: Iniciando carga de %s (state=%s, offset=%s)',
                      self.filename, self.state, self.lineas_procesadas)
         if self.state != 'processing':
-            self.write({
+            self._guardar_progreso({
                 'state': 'processing',
                 'fecha_importacion': fields.Datetime.now(),
             })
@@ -239,7 +245,7 @@ class ToddTxtImport(models.Model):
                 start = offset + 1
                 end = min(start + BATCH_SIZE, len(lineas))
                 if start >= len(lineas):
-                    rec.write({
+                    rec._guardar_progreso({
                         'state': 'done',
                         'total_lineas': total,
                         'log': rec._append_log([
@@ -296,6 +302,7 @@ class ToddTxtImport(models.Model):
                         _logger.exception('TODD: factura línea %s de %s', lp['line_num'], rec.filename)
 
                 vals = {
+                    'state': 'done' if end >= len(lineas) else 'processing',
                     'total_lineas': total,
                     'lineas_procesadas': end - 1,
                     'lineas_omitidas': (rec.lineas_omitidas or 0) + omitidas,
@@ -305,7 +312,6 @@ class ToddTxtImport(models.Model):
                     'errores': (rec.errores or 0) + errores,
                 }
                 if end >= len(lineas):
-                    vals['state'] = 'done'
                     log.append(
                         f'Finalizado {rec.filename}: {vals["facturas_creadas"]} creadas, '
                         f'{vals["facturas_actualizadas"]} actualizadas, {vals["errores"]} errores, '
@@ -322,7 +328,7 @@ class ToddTxtImport(models.Model):
                         rec.filename, start, end - 1, total, creadas, errores,
                     )
                 vals['log'] = rec._append_log(log)
-                rec.write(vals)
+                rec._guardar_progreso(vals)
                 if end >= len(lineas):
                     break
         except Exception as e:
