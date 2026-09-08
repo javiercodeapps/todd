@@ -140,9 +140,7 @@ class ToddTxtImport(models.Model):
     @api.model
     def _pdf_ruta(self, source_dir, archivo_pdf):
         src = os.path.join(source_dir, archivo_pdf) if archivo_pdf else ''
-        if src and os.path.exists(src):
-            return src, None
-        return '', f'PDF no encontrado: {archivo_pdf or "(vacío)"}'
+        return src if src and os.path.exists(src) else ''
 
     @api.model
     def _crear_o_actualizar_factura(self, lp, source_dir):
@@ -151,7 +149,7 @@ class ToddTxtImport(models.Model):
             ('numero_completo', '=', numero),
         ], limit=1)
         nuevo_estado = 'pagado' if 'Pagado' in lp['estado_comp'] else 'adeudado'
-        pdf_ruta, warning = self._pdf_ruta(source_dir, lp['archivo_pdf'])
+        pdf_ruta = self._pdf_ruta(source_dir, lp['archivo_pdf'])
 
         if existe:
             vals = {}
@@ -162,8 +160,8 @@ class ToddTxtImport(models.Model):
                 vals['archivo_pdf_ruta'] = pdf_ruta
             if vals:
                 existe.write(vals)
-                return 'updated', warning
-            return 'skipped', None
+                return 'updated'
+            return 'skipped'
 
         self.env['todd.factura'].create({
             'partner_id': lp['partner_id'],
@@ -185,7 +183,7 @@ class ToddTxtImport(models.Model):
             'dni': lp['dni'],
             'archivo_pdf_ruta': pdf_ruta,
         })
-        return 'created', warning
+        return 'created'
 
     def _append_log(self, lines):
         prev = self.log or ''
@@ -287,13 +285,11 @@ class ToddTxtImport(models.Model):
                 for lp in lineas_parseadas:
                     try:
                         with rec.env.cr.savepoint():
-                            status, warning = rec._crear_o_actualizar_factura(lp, source_dir)
+                            status = rec._crear_o_actualizar_factura(lp, source_dir)
                         if status == 'created':
                             creadas += 1
                         elif status == 'updated':
                             actualizadas += 1
-                        if warning:
-                            log.append(f"Línea {lp['line_num']}: {warning}")
                     except Exception as e:
                         errores += 1
                         log.append(f"Línea {lp['line_num']}: ERROR factura - {e}")

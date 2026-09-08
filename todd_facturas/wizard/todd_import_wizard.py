@@ -53,13 +53,11 @@ class ToddImportWizard(models.TransientModel):
                         partners_map[parsed['nro_socio']] = partner.id
                 parsed['partner_id'] = partners_map[parsed['nro_socio']]
                 with self.env.cr.savepoint():
-                    status, warning = importer._crear_o_actualizar_factura(parsed, source_dir)
+                    status = importer._crear_o_actualizar_factura(parsed, source_dir)
                 if status == 'created':
                     ok += 1
                 elif status == 'updated':
                     actualizadas += 1
-                if warning:
-                    log.append(f'Línea {i}: {warning}')
             except Exception as e:
                 errores += 1
                 log.append(f'Línea {i}: ERROR - {e}')
