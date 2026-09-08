@@ -195,6 +195,15 @@ class ToddTxtImport(models.Model):
             combined = combined[-80000:]
         return combined
 
+    def _marcar_error(self, msg):
+        import_id = self.id
+        self.env.cr.rollback()
+        rec = self.env['todd.txt.import'].browse(import_id)
+        rec.write({
+            'state': 'error',
+            'log': rec._append_log([msg]),
+        })
+
     def action_procesar(self):
         self.ensure_one()
         if self.state not in ('pending', 'processing', 'error'):
@@ -207,7 +216,6 @@ class ToddTxtImport(models.Model):
                 'state': 'processing',
                 'fecha_importacion': fields.Datetime.now(),
             })
-            self.env.cr.commit()
 
         try:
             with open(self.filepath, 'r', encoding='latin-1') as f:
@@ -215,12 +223,11 @@ class ToddTxtImport(models.Model):
         except Exception as e:
             msg = f'Error leyendo archivo: {e}'
             _logger.exception('TODD: %s', msg)
-            self.write({'state': 'error', 'log': self._append_log([msg])})
+            self._marcar_error(msg)
             return
 
         if len(lineas) < 2:
-            msg = 'Archivo vacío o sin líneas de datos'
-            self.write({'state': 'error', 'log': self._append_log([msg])})
+            self._marcar_error('Archivo vacío o sin líneas de datos')
             return
 
         total = len(lineas) - 1
@@ -229,18 +236,18 @@ class ToddTxtImport(models.Model):
 
         try:
             while True:
-                self = self.env['todd.txt.import'].browse(import_id)
-                offset = self.lineas_procesadas or 0
+                rec = self.env['todd.txt.import'].browse(import_id)
+                offset = rec.lineas_procesadas or 0
                 start = offset + 1
                 end = min(start + BATCH_SIZE, len(lineas))
                 if start >= len(lineas):
-                    self.write({
+                    rec.write({
                         'state': 'done',
                         'total_lineas': total,
-                        'log': self._append_log([
-                            f'Finalizado {self.filename}: {self.facturas_creadas} creadas, '
-                            f'{self.facturas_actualizadas} actualizadas, {self.errores} errores, '
-                            f'{self.lineas_omitidas} omitidas'
+                        'log': rec._append_log([
+                            f'Finalizado {rec.filename}: {rec.facturas_creadas} creadas, '
+                            f'{rec.facturas_actualizadas} actualizadas, {rec.errores} errores, '
+                            f'{rec.lineas_omitidas} omitidas'
                         ]),
                     })
                     break
@@ -252,35 +259,35 @@ class ToddTxtImport(models.Model):
 
                 for i in range(start, end):
                     try:
-                        parsed = self._parse_linea_txt(lineas[i], i + 1)
+                        parsed = rec._parse_linea_txt(lineas[i], i + 1)
                         if not parsed:
                             omitidas += 1
-                            cols = len([x for x in lineas[i].split(';')])
+                            cols = len(lineas[i].split(';'))
                             log.append(f'Línea {i + 1}: omitida (columnas insuficientes: {cols})')
                             continue
                         if parsed['nro_socio'] not in partners_map:
                             try:
-                                with self.env.cr.savepoint():
-                                    partner, created = self._get_or_create_partner_todd(parsed)
+                                with rec.env.cr.savepoint():
+                                    partner, created = rec._get_or_create_partner_todd(parsed)
                                     partners_map[parsed['nro_socio']] = partner.id
                                     if created:
                                         partners_nuevos += 1
                             except Exception as e:
                                 errores += 1
                                 log.append(f"Línea {i + 1}: ERROR partner {parsed['nro_socio']} - {e}")
-                                _logger.exception('TODD: partner línea %s de %s', i + 1, self.filename)
+                                _logger.exception('TODD: partner línea %s de %s', i + 1, rec.filename)
                                 continue
                         parsed['partner_id'] = partners_map[parsed['nro_socio']]
                         lineas_parseadas.append(parsed)
                     except Exception as e:
                         errores += 1
                         log.append(f'Línea {i + 1}: ERROR parseo - {e}')
-                        _logger.exception('TODD: parseo línea %s de %s', i + 1, self.filename)
+                        _logger.exception('TODD: parseo línea %s de %s', i + 1, rec.filename)
 
                 for lp in lineas_parseadas:
                     try:
-                        with self.env.cr.savepoint():
-                            status, warning = self._crear_o_actualizar_factura(lp, source_dir)
+                        with rec.env.cr.savepoint():
+                            status, warning = rec._crear_o_actualizar_factura(lp, source_dir)
                         if status == 'created':
                             creadas += 1
                         elif status == 'updated':
@@ -290,44 +297,38 @@ class ToddTxtImport(models.Model):
                     except Exception as e:
                         errores += 1
                         log.append(f"Línea {lp['line_num']}: ERROR factura - {e}")
-                        _logger.exception('TODD: factura línea %s de %s', lp['line_num'], self.filename)
+                        _logger.exception('TODD: factura línea %s de %s', lp['line_num'], rec.filename)
 
                 vals = {
                     'total_lineas': total,
                     'lineas_procesadas': end - 1,
-                    'lineas_omitidas': (self.lineas_omitidas or 0) + omitidas,
-                    'facturas_creadas': (self.facturas_creadas or 0) + creadas,
-                    'facturas_actualizadas': (self.facturas_actualizadas or 0) + actualizadas,
-                    'partners_creados': (self.partners_creados or 0) + partners_nuevos,
-                    'errores': (self.errores or 0) + errores,
+                    'lineas_omitidas': (rec.lineas_omitidas or 0) + omitidas,
+                    'facturas_creadas': (rec.facturas_creadas or 0) + creadas,
+                    'facturas_actualizadas': (rec.facturas_actualizadas or 0) + actualizadas,
+                    'partners_creados': (rec.partners_creados or 0) + partners_nuevos,
+                    'errores': (rec.errores or 0) + errores,
                 }
                 if end >= len(lineas):
                     vals['state'] = 'done'
                     log.append(
-                        f'Finalizado {self.filename}: {vals["facturas_creadas"]} creadas, '
+                        f'Finalizado {rec.filename}: {vals["facturas_creadas"]} creadas, '
                         f'{vals["facturas_actualizadas"]} actualizadas, {vals["errores"]} errores, '
                         f'{vals["lineas_omitidas"]} omitidas'
                     )
                     _logger.info(
                         'TODD: Finalizado %s - Creadas: %s, Actualizadas: %s, Errores: %s, Omitidas: %s',
-                        self.filename, vals['facturas_creadas'], vals['facturas_actualizadas'],
+                        rec.filename, vals['facturas_creadas'], vals['facturas_actualizadas'],
                         vals['errores'], vals['lineas_omitidas'],
                     )
                 else:
                     _logger.info(
                         'TODD: %s lote %s-%s/%s (creadas +%s, errores +%s)',
-                        self.filename, start, end - 1, total, creadas, errores,
+                        rec.filename, start, end - 1, total, creadas, errores,
                     )
-                vals['log'] = self._append_log(log)
-                self.write(vals)
-                self.env.cr.commit()
-                self.env.clear()
+                vals['log'] = rec._append_log(log)
+                rec.write(vals)
                 if end >= len(lineas):
                     break
         except Exception as e:
             _logger.exception('TODD: falla inesperada procesando %s', self.filename)
-            self = self.env['todd.txt.import'].browse(import_id)
-            self.write({
-                'state': 'error',
-                'log': self._append_log([f'ERROR inesperado: {e}']),
-            })
+            self.env['todd.txt.import'].browse(import_id)._marcar_error(f'ERROR inesperado: {e}')
