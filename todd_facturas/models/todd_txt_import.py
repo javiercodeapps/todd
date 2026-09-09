@@ -1,6 +1,7 @@
 import os
 import logging
-from datetime import datetime
+from datetime import date, datetime
+from dateutil.relativedelta import relativedelta
 from odoo import models, fields, api
 
 _logger = logging.getLogger(__name__)
@@ -165,6 +166,10 @@ class ToddTxtImport(models.Model):
             if vals:
                 existe.write(vals)
                 return 'updated'
+            return 'skipped'
+
+        limite = date.today() - relativedelta(years=1)
+        if lp['fecha_fac'] and lp['fecha_fac'] < limite:
             return 'skipped'
 
         try:
