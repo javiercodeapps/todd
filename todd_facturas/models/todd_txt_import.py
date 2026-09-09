@@ -259,6 +259,26 @@ class ToddTxtImport(models.Model):
                 self.errores, self.lineas_omitidas,
             )
 
+    @api.model
+    def _cola_disponible(self):
+        if 'queue.job' not in self.env:
+            return False
+        self.env.cr.execute(
+            """
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'queue_job_function' AND column_name = 'on_fail_method'
+            """
+        )
+        return bool(self.env.cr.fetchone())
+
+    def _rangos_lote(self, total):
+        start = 1
+        file_len = total + 1
+        while start < file_len:
+            end = min(start + BATCH_SIZE, file_len)
+            yield start, end
+            start = end
+
     def action_procesar(self):
         self.ensure_one()
         if self.state == 'processing':
@@ -292,20 +312,19 @@ class ToddTxtImport(models.Model):
             'log': False,
         })
 
-        lotes = 0
-        start = 1
-        file_len = total + 1
-        while start < file_len:
-            end = min(start + BATCH_SIZE, file_len)
-            self.with_delay(
-                channel='root.todd_import',
-                identity_key=f'todd.txt.import.{self.id}.{start}.{end}',
-                description=f'Todd {self.filename} líneas {start}-{end - 1}',
-            )._procesar_lote(start, end, total)
-            lotes += 1
-            start = end
-
-        _logger.info('TODD: Encolados %s lotes para %s (%s líneas)', lotes, self.filename, total)
+        rangos = list(self._rangos_lote(total))
+        if self._cola_disponible():
+            for start, end in rangos:
+                self.with_delay(
+                    channel='root.todd_import',
+                    identity_key=f'todd.txt.import.{self.id}.{start}.{end}',
+                    description=f'Todd {self.filename} líneas {start}-{end - 1}',
+                )._procesar_lote(start, end, total)
+            _logger.info('TODD: Encolados %s lotes para %s (%s líneas)', len(rangos), self.filename, total)
+        else:
+            _logger.warning('TODD: queue_job no está actualizado, proceso sincrónico de %s', self.filename)
+            for start, end in rangos:
+                self._procesar_lote(start, end, total)
         return True
 
     def _procesar_lote(self, start, end, total):
