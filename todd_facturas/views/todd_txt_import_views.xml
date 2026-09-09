@@ -9,7 +9,7 @@
                     <button name="action_procesar" string="Procesar" type="object"
                             class="btn-primary" invisible="state != 'pending'"/>
                     <button name="action_procesar" string="Reanudar" type="object"
-                            class="btn-primary" invisible="state not in ('processing', 'error')"/>
+                            class="btn-primary" invisible="state != 'error'"/>
                     <button name="action_escanear_y_procesar" string="Escanear y Procesar" type="object"
                             class="btn-secondary"/>
                     <field name="state" widget="statusbar"/>

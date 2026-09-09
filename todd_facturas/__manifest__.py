@@ -1,7 +1,7 @@
 {
     'name': "Todd Facturas",
     'version': '19.0.1.1.0',
-    'depends': ['base', 'portal'],
+    'depends': ['base', 'portal', 'queue_job'],
     'author': "Todd",
     'category': 'Accounting',
     'summary': 'Importación de facturas desde archivos TXT',
@@ -15,6 +15,7 @@
         'views/res_partner_views.xml',
         'views/todd_menu.xml',
         'data/todd_cron.xml',
+        'data/todd_queue_job.xml',
         'templates/portal_templates.xml',
     ],
     'installable': True,
