@@ -259,18 +259,6 @@ class ToddTxtImport(models.Model):
                 self.errores, self.lineas_omitidas,
             )
 
-    @api.model
-    def _cola_disponible(self):
-        if 'queue.job' not in self.env:
-            return False
-        self.env.cr.execute(
-            """
-            SELECT 1 FROM information_schema.columns
-            WHERE table_name = 'queue_job_function' AND column_name = 'on_fail_method'
-            """
-        )
-        return bool(self.env.cr.fetchone())
-
     def _rangos_lote(self, total):
         start = 1
         file_len = total + 1
@@ -312,19 +300,20 @@ class ToddTxtImport(models.Model):
             'log': False,
         })
 
+        self.env.cr.execute(
+            "DELETE FROM queue_job_function WHERE name = %s",
+            ('<todd.txt.import>._procesar_lote',),
+        )
+        self.env.registry.clear_cache()
+
         rangos = list(self._rangos_lote(total))
-        if self._cola_disponible():
-            for start, end in rangos:
-                self.with_delay(
-                    channel='root',
-                    identity_key=f'todd.txt.import.{self.id}.{start}.{end}',
-                    description=f'Todd {self.filename} líneas {start}-{end - 1}',
-                )._procesar_lote(start, end, total)
-            _logger.info('TODD: Encolados %s lotes para %s (%s líneas)', len(rangos), self.filename, total)
-        else:
-            _logger.warning('TODD: queue_job no está actualizado, proceso sincrónico de %s', self.filename)
-            for start, end in rangos:
-                self._procesar_lote(start, end, total)
+        for start, end in rangos:
+            self.with_delay(
+                channel='root',
+                identity_key=f'todd.txt.import.{self.id}.{start}.{end}',
+                description=f'Todd {self.filename} líneas {start}-{end - 1}',
+            )._procesar_lote(start, end, total)
+        _logger.info('TODD: Encolados %s lotes para %s (%s líneas)', len(rangos), self.filename, total)
         return True
 
     def _procesar_lote(self, start, end, total):
