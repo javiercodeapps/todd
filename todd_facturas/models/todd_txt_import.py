@@ -316,7 +316,7 @@ class ToddTxtImport(models.Model):
         if self._cola_disponible():
             for start, end in rangos:
                 self.with_delay(
-                    channel='root.todd_import',
+                    channel='root',
                     identity_key=f'todd.txt.import.{self.id}.{start}.{end}',
                     description=f'Todd {self.filename} líneas {start}-{end - 1}',
                 )._procesar_lote(start, end, total)
