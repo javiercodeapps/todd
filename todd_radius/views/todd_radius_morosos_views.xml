@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="todd_radius_morosos_form" model="ir.ui.view">
+        <field name="name">todd.radius.morosos.form</field>
+        <field name="model">todd.radius.morosos</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_procesar" type="object"
+                            string="Procesar" class="oe_highlight"/>
+                    <button name="action_desconectar_todos" type="object"
+                            string="Desconectar Todos"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="fecha"/>
+                            <field name="descripcion"/>
+                        </group>
+                        <group>
+                            <field name="resultado" readonly="1"/>
+                            <field name="usuario_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="detalle" placeholder="Lista de usuarios, uno por línea..."/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="todd_radius_morosos_list" model="ir.ui.view">
+        <field name="name">todd.radius.morosos.list</field>
+        <field name="model">todd.radius.morosos</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="fecha"/>
+                <field name="descripcion"/>
+                <field name="pendiente"/>
+                <field name="resultado"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_todd_radius_morosos" model="ir.actions.act_window">
+        <field name="name">Morosos</field>
+        <field name="res_model">todd.radius.morosos</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

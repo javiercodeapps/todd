@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <menuitem id="menu_todd_radius_root"
+              name="Todd Radius"
+              sequence="110"
+              groups="group_todd_radius_user"/>
+
+    <!-- Usuarios -->
+    <menuitem id="menu_todd_radius_usuarios"
+              name="Usuarios"
+              parent="menu_todd_radius_root"
+              sequence="10"
+              groups="group_todd_radius_user"/>
+
+    <menuitem id="menu_todd_radius_usuarios_listado"
+              name="Listado"
+              parent="menu_todd_radius_usuarios"
+              action="action_todd_radius_users"
+              sequence="10"
+              groups="group_todd_radius_user"/>
+
+    <!-- Reportes -->
+    <menuitem id="menu_todd_radius_reportes"
+              name="Reportes"
+              parent="menu_todd_radius_root"
+              sequence="20"
+              groups="group_todd_radius_user"/>
+
+    <menuitem id="menu_todd_radius_reportes_sesiones"
+              name="Sesiones Activas"
+              parent="menu_todd_radius_reportes"
+              action="action_todd_radius_sessions"
+              sequence="10"
+              groups="group_todd_radius_user"/>
+
+    <menuitem id="menu_todd_radius_reportes_authlog"
+              name="Log de Autenticación"
+              parent="menu_todd_radius_reportes"
+              action="action_todd_radius_authlog"
+              sequence="20"
+              groups="group_todd_radius_user"/>
+
+    <!-- Configuración -->
+    <menuitem id="menu_todd_radius_config"
+              name="Configuración"
+              parent="menu_todd_radius_root"
+              sequence="30"
+              groups="group_todd_radius_manager"/>
+
+    <menuitem id="menu_todd_radius_config_nas"
+              name="Servidores NAS"
+              parent="menu_todd_radius_config"
+              action="action_todd_radius_nas"
+              sequence="10"
+              groups="group_todd_radius_manager"/>
+
+    <menuitem id="menu_todd_radius_config_ippool"
+              name="Pool de IPs"
+              parent="menu_todd_radius_config"
+              action="action_todd_radius_ippool"
+              sequence="20"
+              groups="group_todd_radius_manager"/>
+
+    <!-- Morosos -->
+    <menuitem id="menu_todd_radius_morosos"
+              name="Morosos"
+              parent="menu_todd_radius_root"
+              sequence="40"
+              groups="group_todd_radius_technical"/>
+
+    <menuitem id="menu_todd_radius_morosos_registro"
+              name="Registro"
+              parent="menu_todd_radius_morosos"
+              action="action_todd_radius_morosos"
+              sequence="10"
+              groups="group_todd_radius_technical"/>
+
+</odoo>

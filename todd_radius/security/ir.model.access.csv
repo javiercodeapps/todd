@@ -1,0 +1,17 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_todd_radius_userinfo_user,todd.radius.userinfo.user,model_todd_radius_userinfo,group_todd_radius_user,1,0,0,0
+access_todd_radius_userinfo_manager,todd.radius.userinfo.manager,model_todd_radius_userinfo,group_todd_radius_manager,1,1,1,1
+access_todd_radius_radcheck_user,todd.radius.radcheck.user,model_todd_radius_radcheck,group_todd_radius_user,1,0,0,0
+access_todd_radius_radcheck_manager,todd.radius.radcheck.manager,model_todd_radius_radcheck,group_todd_radius_manager,1,1,1,1
+access_todd_radius_radreply_user,todd.radius.radreply.user,model_todd_radius_radreply,group_todd_radius_user,1,0,0,0
+access_todd_radius_radreply_manager,todd.radius.radreply.manager,model_todd_radius_radreply,group_todd_radius_manager,1,1,1,1
+access_todd_radius_radusergroup_user,todd.radius.radusergroup.user,model_todd_radius_radusergroup,group_todd_radius_user,1,0,0,0
+access_todd_radius_radusergroup_manager,todd.radius.radusergroup.manager,model_todd_radius_radusergroup,group_todd_radius_manager,1,1,1,1
+access_todd_radius_radacct_user,todd.radius.radacct.user,model_todd_radius_radacct,group_todd_radius_user,1,0,0,0
+access_todd_radius_radpostauth_user,todd.radius.radpostauth.user,model_todd_radius_radpostauth,group_todd_radius_user,1,0,0,0
+access_todd_radius_nas_user,todd.radius.nas.user,model_todd_radius_nas,group_todd_radius_user,1,0,0,0
+access_todd_radius_nas_manager,todd.radius.nas.manager,model_todd_radius_nas,group_todd_radius_manager,1,1,1,1
+access_todd_radius_radippool_user,todd.radius.radippool.user,model_todd_radius_radippool,group_todd_radius_user,1,0,0,0
+access_todd_radius_radippool_manager,todd.radius.radippool.manager,model_todd_radius_radippool,group_todd_radius_manager,1,1,1,1
+access_todd_radius_morosos_user,todd.radius.morosos.user,model_todd_radius_morosos,group_todd_radius_user,1,0,0,0
+access_todd_radius_morosos_manager,todd.radius.morosos.manager,model_todd_radius_morosos,group_todd_radius_manager,1,1,1,1

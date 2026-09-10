@@ -1,0 +1,21 @@
+{
+    'name': "Todd Radius",
+    'version': '19.0.1.0.0',
+    'depends': ['base', 'portal'],
+    'author': "Todd",
+    'category': 'Network',
+    'summary': 'Gestión de usuarios y servicios RADIUS',
+    'web_icon': 'todd_radius,static/description/icon.png',
+    'data': [
+        'security/todd_security.xml',
+        'security/ir.model.access.csv',
+        'views/todd_radius_usuario_views.xml',
+        'views/todd_radius_reportes_views.xml',
+        'views/todd_radius_config_views.xml',
+        'views/todd_radius_morosos_views.xml',
+        'views/todd_radius_menu.xml',
+    ],
+    'installable': True,
+    'application': True,
+    'license': 'LGPL-3',
+}

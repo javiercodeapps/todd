@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="todd_radius_userinfo_form" model="ir.ui.view">
+        <field name="name">todd.radius.userinfo.form</field>
+        <field name="model">todd.radius.userinfo</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="sync_from_radius" type="object"
+                            string="Sync from RADIUS" icon="fa-refresh"/>
+                    <button name="sync_from_radius" type="object"
+                            string="Sync All"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="username"/>
+                            <field name="firstname"/>
+                            <field name="lastname"/>
+                            <field name="email"/>
+                            <field name="company"/>
+                            <field name="mobilephone"/>
+                            <field name="address"/>
+                            <field name="city"/>
+                        </group>
+                        <group>
+                            <field name="password" password="True"/>
+                            <field name="groups_display"/>
+                            <field name="ip_address"/>
+                            <field name="is_online"/>
+                            <field name="notes"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="tv"/>
+                            <field name="tvuser"/>
+                            <field name="tvpass"/>
+                        </group>
+                        <group>
+                            <field name="creationdate"/>
+                            <field name="updatedate"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="todd_radius_userinfo_list" model="ir.ui.view">
+        <field name="name">todd.radius.userinfo.list</field>
+        <field name="model">todd.radius.userinfo</field>
+        <field name="arch" type="xml">
+            <list decoration-success="is_online == True" decoration-danger="is_online == False">
+                <field name="username"/>
+                <field name="firstname"/>
+                <field name="lastname"/>
+                <field name="company"/>
+                <field name="mobilephone"/>
+                <field name="groups_display"/>
+                <field name="ip_address"/>
+                <field name="is_online"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="todd_radius_userinfo_search" model="ir.ui.view">
+        <field name="name">todd.radius.userinfo.search</field>
+        <field name="model">todd.radius.userinfo</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="username"/>
+                <field name="firstname"/>
+                <field name="lastname"/>
+                <field name="company"/>
+                <filter name="online" string="En línea"
+                        domain="[('is_online', '=', True)]"/>
+                <filter name="offline" string="Desconectado"
+                        domain="[('is_online', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_todd_radius_users" model="ir.actions.act_window">
+        <field name="name">Usuarios RADIUS</field>
+        <field name="res_model">todd.radius.userinfo</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

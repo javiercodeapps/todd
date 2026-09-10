@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- radacct views -->
+    <record id="todd_radius_radacct_list" model="ir.ui.view">
+        <field name="name">todd.radius.radacct.list</field>
+        <field name="model">todd.radius.radacct</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="username"/>
+                <field name="nasipaddress"/>
+                <field name="acctstarttime"/>
+                <field name="acctstoptime"/>
+                <field name="acctsessiontime"/>
+                <field name="calledstationid"/>
+                <field name="callingstationid"/>
+                <field name="framedipaddress"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="todd_radius_radacct_search" model="ir.ui.view">
+        <field name="name">todd.radius.radacct.search</field>
+        <field name="model">todd.radius.radacct</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="username"/>
+                <field name="nasipaddress"/>
+                <filter name="online" string="En línea"
+                        domain="[('acctstoptime', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_todd_radius_sessions" model="ir.actions.act_window">
+        <field name="name">Sesiones RADIUS</field>
+        <field name="res_model">todd.radius.radacct</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- radpostauth views -->
+    <record id="todd_radius_radpostauth_list" model="ir.ui.view">
+        <field name="name">todd.radius.radpostauth.list</field>
+        <field name="model">todd.radius.radpostauth</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="username"/>
+                <field name="reply"/>
+                <field name="authdate"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="todd_radius_radpostauth_search" model="ir.ui.view">
+        <field name="name">todd.radius.radpostauth.search</field>
+        <field name="model">todd.radius.radpostauth</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="username"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_todd_radius_authlog" model="ir.actions.act_window">
+        <field name="name">Log de Autenticación</field>
+        <field name="res_model">todd.radius.radpostauth</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>
