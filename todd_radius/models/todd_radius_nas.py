@@ -18,14 +18,21 @@ class ToddRadiusNas(models.Model):
 
     def init(self):
         self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_nas CASCADE")
-        try:
+        self.env.cr.execute("""
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.foreign_tables
+                WHERE foreign_table_name = 'nas'
+            )
+        """)
+        fdw_ready = self.env.cr.fetchone()[0]
+        if fdw_ready:
             self.env.cr.execute("""
                 CREATE OR REPLACE VIEW todd_radius_nas AS
                 SELECT id AS radius_id, id, nasname, shortname, type, ports,
                        secret, server, community, description
                 FROM nas
             """)
-        except Exception:
+        else:
             self.env.cr.execute("""
                 CREATE OR REPLACE VIEW todd_radius_nas AS
                 SELECT 1 AS radius_id, 1 AS id, NULL::varchar AS nasname,

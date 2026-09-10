@@ -51,7 +51,14 @@ class ToddRadiusUserinfo(models.Model):
 
     def init(self):
         self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_userinfo CASCADE")
-        try:
+        self.env.cr.execute("""
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.foreign_tables
+                WHERE foreign_table_name = 'userinfo'
+            )
+        """)
+        fdw_ready = self.env.cr.fetchone()[0]
+        if fdw_ready:
             self.env.cr.execute("""
                 CREATE OR REPLACE VIEW todd_radius_userinfo AS
                 SELECT id AS radius_id, username, firstname, lastname, email, department, company,
@@ -61,7 +68,7 @@ class ToddRadiusUserinfo(models.Model):
                        creationdate, updatedate, creationby, updateby
                 FROM userinfo
             """)
-        except Exception:
+        else:
             self.env.cr.execute("""
                 CREATE OR REPLACE VIEW todd_radius_userinfo AS
                 SELECT 1 AS radius_id, NULL::varchar AS username, NULL::varchar AS firstname,
