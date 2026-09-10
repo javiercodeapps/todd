@@ -7,10 +7,10 @@
         <field name="arch" type="xml">
             <form>
                 <header>
+                    <button name="action_test_connection" type="object"
+                            string="Test Conexión" class="oe_highlight"/>
                     <button name="sync_from_radius" type="object"
                             string="Sync from RADIUS" icon="fa-refresh"/>
-                    <button name="sync_from_radius" type="object"
-                            string="Sync All"/>
                 </header>
                 <sheet>
                     <group>

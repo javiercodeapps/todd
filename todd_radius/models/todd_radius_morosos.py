@@ -22,8 +22,7 @@ class ToddRadiusMorosos(models.Model):
 
     def init(self):
         self.env.cr.execute("""
-            DROP TABLE IF EXISTS todd_radius_morosos CASCADE;
-            CREATE TABLE todd_radius_morosos (
+            CREATE TABLE IF NOT EXISTS todd_radius_morosos (
                 id SERIAL PRIMARY KEY,
                 fecha TIMESTAMP NOT NULL,
                 fecha_proceso TIMESTAMP,
@@ -32,7 +31,7 @@ class ToddRadiusMorosos(models.Model):
                 detalle TEXT,
                 resultado TEXT,
                 usuario_id INTEGER
-            );
+            )
         """)
 
     def action_procesar(self):

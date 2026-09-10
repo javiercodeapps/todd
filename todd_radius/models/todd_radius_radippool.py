@@ -22,44 +22,38 @@ class ToddRadiusRadippool(models.Model):
 
     def init(self):
         self.env.cr.execute("""
-            DROP TABLE IF EXISTS todd_radius_radippool CASCADE;
-            CREATE TABLE todd_radius_radippool (
-                id SERIAL PRIMARY KEY,
-                radius_id INTEGER,
-                pool_name VARCHAR(128),
-                framedipaddress VARCHAR(64),
-                nasipaddress VARCHAR(64),
-                calledstationid VARCHAR(128),
-                callingstationid VARCHAR(128),
-                expiry_time TIMESTAMP,
-                username VARCHAR(64),
-                pool_key VARCHAR(128)
-            );
-            CREATE INDEX idx_todd_radius_radippool_pool_name ON todd_radius_radippool(pool_name);
-            CREATE INDEX idx_todd_radius_radippool_username ON todd_radius_radippool(username);
+            CREATE OR REPLACE VIEW todd_radius_radippool AS
+            SELECT 1 AS id, NULL::varchar AS pool_name, NULL::varchar AS framedipaddress,
+                   NULL::varchar AS nasipaddress, NULL::varchar AS calledstationid,
+                   NULL::varchar AS callingstationid, NULL::timestamp AS expiry_time,
+                   NULL::varchar AS username, NULL::varchar AS pool_key,
+                   NULL::integer AS radius_id
+            WHERE FALSE
         """)
 
-    def sync_from_radius(self):
-        self.env.cr.execute("DELETE FROM todd_radius_radippool")
-        rows = self.env['todd.radius.db']._execute("SELECT * FROM radippool")
-        if not rows:
-            return
-        for row in rows:
-            self.env.cr.execute("""
-                INSERT INTO todd_radius_radippool
-                    (radius_id, pool_name, framedipaddress, nasipaddress, calledstationid,
-                     callingstationid, expiry_time, username, pool_key)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                row.get('id'), row.get('pool_name'), row.get('framedipaddress'),
-                row.get('nasipaddress'), row.get('calledstationid'),
-                row.get('callingstationid'), row.get('expiry_time'),
-                row.get('username'), row.get('pool_key'),
-            ))
-        _logger.info('TODD RADIUS: Sincronizadas %d IPs del pool', len(rows))
+    def search(self, args=None, offset=0, limit=None, order=None):
+        args = args or []
+        Db = self.env['todd.radius.db']
+        query = "SELECT id FROM radippool WHERE 1=1"
+        params = []
+        for leaf in args:
+            if leaf[0] == 'pool_name' and leaf[1] == '=':
+                query += " AND pool_name = %s"
+                params.append(leaf[2])
+            elif leaf[0] == 'username' and leaf[1] == '=':
+                query += " AND username = %s"
+                params.append(leaf[2])
+        rows = Db._execute(query, tuple(params) if params else None)
+        return self.browse([r['id'] for r in rows])
+
+    def read(self, fields=None, load='_classic_read'):
+        if not self.ids:
+            return []
+        Db = self.env['todd.radius.db']
+        placeholders = ','.join(['%s'] * len(self.ids))
+        rows = Db._execute(f"SELECT * FROM radippool WHERE id IN ({placeholders})", tuple(self.ids))
+        rows_by_id = {r['id']: r for r in rows}
+        return [{'id': rec.id, **rows_by_id.get(rec.id, {})} for rec in self]
 
     def name_get(self):
-        result = []
-        for rec in self:
-            result.append((rec.id, f"{rec.pool_name}: {rec.framedipaddress}"))
-        return result
+        return [(rec.id, f"{rec.pool_name}: {rec.framedipaddress}") for rec in self]

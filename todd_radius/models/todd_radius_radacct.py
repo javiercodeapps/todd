@@ -8,7 +8,7 @@ _logger = logging.getLogger(__name__)
 class ToddRadiusRadacct(models.Model):
     _name = 'todd.radius.radacct'
     _auto = False
-    _description = 'Sesiones RADIUS (radacct) - Solo lectura'
+    _description = 'Sesiones RADIUS'
 
     radacctid = fields.Integer(string='ID', readonly=True)
     acctsessionid = fields.Char(string='Sesión')
@@ -23,8 +23,8 @@ class ToddRadiusRadacct(models.Model):
     acctstoptime = fields.Datetime(string='Fin')
     acctsessiontime = fields.Integer(string='Duración (s)')
     acctauthentic = fields.Char(string='Autenticación')
-    connectinfo_start = fields.Char(string='Info Conexión Inicio')
-    connectinfo_stop = fields.Char(string='Info Conexión Fin')
+    connectinfo_start = fields.Char(string='Info Inicio')
+    connectinfo_stop = fields.Char(string='Info Fin')
     acctinputoctets = fields.Integer(string='Bytes Entrada')
     acctoutputoctets = fields.Integer(string='Bytes Salida')
     calledstationid = fields.Char(string='Llamado')
@@ -36,69 +36,52 @@ class ToddRadiusRadacct(models.Model):
 
     def init(self):
         self.env.cr.execute("""
-            DROP TABLE IF EXISTS todd_radius_radacct CASCADE;
-            CREATE TABLE todd_radius_radacct (
-                id SERIAL PRIMARY KEY,
-                radacctid INTEGER,
-                acctsessionid VARCHAR(64),
-                acctuniqueid VARCHAR(64),
-                username VARCHAR(64),
-                groupname VARCHAR(128),
-                realm VARCHAR(128),
-                nasipaddress VARCHAR(64),
-                nasportid VARCHAR(64),
-                nasporttype VARCHAR(32),
-                acctstarttime TIMESTAMP,
-                acctstoptime TIMESTAMP,
-                acctsessiontime INTEGER,
-                acctauthentic VARCHAR(32),
-                connectinfo_start VARCHAR(255),
-                connectinfo_stop VARCHAR(255),
-                acctinputoctets BIGINT,
-                acctoutputoctets BIGINT,
-                calledstationid VARCHAR(128),
-                callingstationid VARCHAR(128),
-                acctterminatecause VARCHAR(32),
-                servicetype VARCHAR(32),
-                framedprotocol VARCHAR(32),
-                framedipaddress VARCHAR(64)
-            );
-            CREATE INDEX idx_todd_radius_radacct_username ON todd_radius_radacct(username);
+            CREATE OR REPLACE VIEW todd_radius_radacct AS
+            SELECT 1 AS id, NULL::varchar AS acctsessionid, NULL::varchar AS acctuniqueid,
+                   NULL::varchar AS username, NULL::varchar AS groupname, NULL::varchar AS realm,
+                   NULL::varchar AS nasipaddress, NULL::varchar AS nasportid,
+                   NULL::varchar AS nasporttype, NULL::timestamp AS acctstarttime,
+                   NULL::timestamp AS acctstoptime, NULL::integer AS acctsessiontime,
+                   NULL::varchar AS acctauthentic, NULL::varchar AS connectinfo_start,
+                   NULL::varchar AS connectinfo_stop, NULL::integer AS acctinputoctets,
+                   NULL::integer AS acctoutputoctets, NULL::varchar AS calledstationid,
+                   NULL::varchar AS callingstationid, NULL::varchar AS acctterminatecause,
+                   NULL::varchar AS servicetype, NULL::varchar AS framedprotocol,
+                   NULL::varchar AS framedipaddress, NULL::integer AS radacctid
+            WHERE FALSE
         """)
 
-    def sync_from_radius(self):
-        self.env.cr.execute("DELETE FROM todd_radius_radacct")
-        rows = self.env['todd.radius.db']._execute(
-            "SELECT * FROM radacct ORDER BY acctstarttime DESC LIMIT 10000"
+    def search(self, args=None, offset=0, limit=None, order=None):
+        args = args or []
+        Db = self.env['todd.radius.db']
+        query = "SELECT radacctid AS id FROM radacct WHERE 1=1"
+        params = []
+        for leaf in args:
+            if leaf[0] == 'username' and leaf[1] == '=':
+                query += " AND username = %s"
+                params.append(leaf[2])
+        if order:
+            query += f" ORDER BY {order}"
+        if limit:
+            query += f" LIMIT {limit}"
+        rows = Db._execute(query, tuple(params) if params else None)
+        return self.browse([r['id'] for r in rows])
+
+    def read(self, fields=None, load='_classic_read'):
+        if not self.ids:
+            return []
+        Db = self.env['todd.radius.db']
+        placeholders = ','.join(['%s'] * len(self.ids))
+        rows = Db._execute(
+            f"SELECT *, radacctid AS id FROM radacct WHERE radacctid IN ({placeholders})",
+            tuple(self.ids),
         )
-        if not rows:
-            return
-        for row in rows:
-            self.env.cr.execute("""
-                INSERT INTO todd_radius_radacct
-                    (radacctid, acctsessionid, acctuniqueid, username, groupname, realm,
-                     nasipaddress, nasportid, nasporttype, acctstarttime, acctstoptime,
-                     acctsessiontime, acctauthentic, connectinfo_start, connectinfo_stop,
-                     acctinputoctets, acctoutputoctets, calledstationid, callingstationid,
-                     acctterminatecause, servicetype, framedprotocol, framedipaddress)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                row.get('radacctid'), row.get('acctsessionid'), row.get('acctuniqueid'),
-                row.get('username'), row.get('groupname'), row.get('realm'),
-                row.get('nasipaddress'), row.get('nasportid'), row.get('nasporttype'),
-                row.get('acctstarttime'), row.get('acctstoptime'),
-                row.get('acctsessiontime'), row.get('acctauthentic'),
-                row.get('connectinfo_start'), row.get('connectinfo_stop'),
-                row.get('acctinputoctets'), row.get('acctoutputoctets'),
-                row.get('calledstationid'), row.get('callingstationid'),
-                row.get('acctterminatecause'), row.get('servicetype'),
-                row.get('framedprotocol'), row.get('framedipaddress'),
-            ))
-        _logger.info('TODD RADIUS: Sincronizadas %d sesiones radacct', len(rows))
+        rows_by_id = {r['id']: r for r in rows}
+        return [{'id': rec.id, **rows_by_id.get(rec.id, {})} for rec in self]
 
     def name_get(self):
         result = []
         for rec in self:
-            start = rec.acctstarttime.strftime('%Y-%m-%d %H:%M') if rec.acctstarttime else '?'
+            start = rec.acctstarttime.strftime('%d/%m %H:%M') if rec.acctstarttime else '?'
             result.append((rec.id, f"{rec.username} desde {rec.nasipaddress} el {start}"))
         return result

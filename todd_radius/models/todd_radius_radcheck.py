@@ -8,9 +8,9 @@ _logger = logging.getLogger(__name__)
 class ToddRadiusRadcheck(models.Model):
     _name = 'todd.radius.radcheck'
     _auto = False
-    _description = 'Reglas de verificación RADIUS (radcheck)'
+    _description = 'Atributos check RADIUS'
 
-    radius_id = fields.Integer(string='ID RADIUS', readonly=True)
+    radius_id = fields.Integer(string='ID', readonly=True)
     username = fields.Char(string='Usuario', index=True)
     attribute = fields.Char(string='Atributo')
     op = fields.Char(string='Operador')
@@ -18,42 +18,54 @@ class ToddRadiusRadcheck(models.Model):
 
     def init(self):
         self.env.cr.execute("""
-            DROP TABLE IF EXISTS todd_radius_radcheck CASCADE;
-            CREATE TABLE todd_radius_radcheck (
-                id SERIAL PRIMARY KEY,
-                radius_id INTEGER,
-                username VARCHAR(64),
-                attribute VARCHAR(128),
-                op VARCHAR(32),
-                value VARCHAR(255)
-            );
-            CREATE INDEX idx_todd_radius_radcheck_username ON todd_radius_radcheck(username);
+            CREATE OR REPLACE VIEW todd_radius_radcheck AS
+            SELECT 1 AS id, NULL::varchar AS username, NULL::varchar AS attribute,
+                   NULL::varchar AS op, NULL::varchar AS value, NULL::integer AS radius_id
+            WHERE FALSE
         """)
 
-    def sync_for_user(self, username):
-        self.env.cr.execute("DELETE FROM todd_radius_radcheck WHERE username = %s", (username,))
-        rows = self.env['todd.radius.db']._execute(
-            "SELECT * FROM radcheck WHERE username = %s", (username,)
-        )
-        for row in rows:
-            self.env.cr.execute("""
-                INSERT INTO todd_radius_radcheck (radius_id, username, attribute, op, value)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (row.get('id'), row.get('username'), row.get('attribute'), row.get('op'), row.get('value')))
+    def search(self, args=None, offset=0, limit=None, order=None):
+        args = args or []
+        Db = self.env['todd.radius.db']
+        query = "SELECT id FROM radcheck WHERE 1=1"
+        params = []
+        for leaf in args:
+            if leaf[0] == 'username' and leaf[1] == '=':
+                query += " AND username = %s"
+                params.append(leaf[2])
+        rows = Db._execute(query, tuple(params) if params else None)
+        return self.browse([r['id'] for r in rows])
 
-    @api.model_create_multi
+    def read(self, fields=None, load='_classic_read'):
+        if not self.ids:
+            return []
+        Db = self.env['todd.radius.db']
+        placeholders = ','.join(['%s'] * len(self.ids))
+        rows = Db._execute(f"SELECT * FROM radcheck WHERE id IN ({placeholders})", tuple(self.ids))
+        rows_by_id = {r['id']: r for r in rows}
+        return [{'id': rec.id, **rows_by_id.get(rec.id, {})} for rec in self]
+
     def create(self, vals_list):
+        Db = self.env['todd.radius.db']
         for vals in vals_list:
-            self.env['todd.radius.db']._execute_write(
+            Db._execute_write(
                 "INSERT INTO radcheck (username, attribute, op, value) VALUES (%s, %s, %s, %s)",
-                (vals.get('username'), vals.get('attribute'), vals.get('op'), vals.get('value'))
+                (vals.get('username'), vals.get('attribute'), vals.get('op'), vals.get('value')),
             )
         if vals_list:
-            self.sync_for_user(vals_list[0].get('username'))
-        return self.search([('username', '=', vals_list[0].get('username'))]) if vals_list else self.browse()
+            rows = Db._execute(
+                "SELECT id FROM radcheck WHERE username = %s ORDER BY id DESC LIMIT %s",
+                (vals_list[0]['username'], len(vals_list)),
+            )
+            return self.browse([r['id'] for r in rows])
+        return self.browse()
+
+    def unlink(self):
+        Db = self.env['todd.radius.db']
+        for rec in self:
+            if rec.radius_id:
+                Db._execute_write("DELETE FROM radcheck WHERE id = %s", (rec.radius_id,))
+        return True
 
     def name_get(self):
-        result = []
-        for rec in self:
-            result.append((rec.id, f"{rec.username}: {rec.attribute} = {rec.value}"))
-        return result
+        return [(rec.id, f"{rec.username}: {rec.attribute} = {rec.value}") for rec in self]

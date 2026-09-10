@@ -16,63 +16,59 @@ class ToddRadiusRadusergroup(models.Model):
 
     def init(self):
         self.env.cr.execute("""
-            DROP TABLE IF EXISTS todd_radius_radusergroup CASCADE;
-            CREATE TABLE todd_radius_radusergroup (
-                id SERIAL PRIMARY KEY,
-                username VARCHAR(64) NOT NULL,
-                groupname VARCHAR(128) NOT NULL,
-                priority INTEGER DEFAULT 0
-            );
-            CREATE INDEX idx_todd_radius_radusergroup_username ON todd_radius_radusergroup(username);
+            CREATE OR REPLACE VIEW todd_radius_radusergroup AS
+            SELECT 1 AS id, NULL::varchar AS username, NULL::varchar AS groupname,
+                   NULL::integer AS priority
+            WHERE FALSE
         """)
 
-    def sync_for_user(self, username):
-        self.env.cr.execute("DELETE FROM todd_radius_radusergroup WHERE username = %s", (username,))
-        rows = self.env['todd.radius.db']._execute(
-            "SELECT * FROM radusergroup WHERE username = %s", (username,)
-        )
-        for row in rows:
-            self.env.cr.execute("""
-                INSERT INTO todd_radius_radusergroup (username, groupname, priority)
-                VALUES (%s, %s, %s)
-            """, (row.get('username'), row.get('groupname'), row.get('priority', 0)))
+    def search(self, args=None, offset=0, limit=None, order=None):
+        args = args or []
+        Db = self.env['todd.radius.db']
+        query = "SELECT id FROM radusergroup WHERE 1=1"
+        params = []
+        for leaf in args:
+            if leaf[0] == 'username' and leaf[1] == '=':
+                query += " AND username = %s"
+                params.append(leaf[2])
+            elif leaf[0] == 'groupname' and leaf[1] == '=':
+                query += " AND groupname = %s"
+                params.append(leaf[2])
+        rows = Db._execute(query, tuple(params) if params else None)
+        return self.browse([r['id'] for r in rows])
 
-    def sync_from_radius(self):
-        self.env.cr.execute("DELETE FROM todd_radius_radusergroup")
-        rows = self.env['todd.radius.db']._execute("SELECT * FROM radusergroup")
-        for row in rows:
-            self.env.cr.execute("""
-                INSERT INTO todd_radius_radusergroup (username, groupname, priority)
-                VALUES (%s, %s, %s)
-            """, (row.get('username'), row.get('groupname'), row.get('priority', 0)))
+    def read(self, fields=None, load='_classic_read'):
+        if not self.ids:
+            return []
+        Db = self.env['todd.radius.db']
+        placeholders = ','.join(['%s'] * len(self.ids))
+        rows = Db._execute(f"SELECT * FROM radusergroup WHERE id IN ({placeholders})", tuple(self.ids))
+        rows_by_id = {r['id']: r for r in rows}
+        return [{'id': rec.id, **rows_by_id.get(rec.id, {})} for rec in self]
 
-    @api.model_create_multi
     def create(self, vals_list):
+        Db = self.env['todd.radius.db']
         for vals in vals_list:
-            self.env['todd.radius.db']._execute_write(
+            Db._execute_write(
                 "INSERT INTO radusergroup (username, groupname, priority) VALUES (%s, %s, %s)",
-                (vals.get('username'), vals.get('groupname'), vals.get('priority', 0))
+                (vals.get('username'), vals.get('groupname'), vals.get('priority', 0)),
             )
         if vals_list:
-            self.sync_for_user(vals_list[0].get('username'))
-        return self.search([
-            ('username', '=', vals_list[0].get('username')),
-        ]) if vals_list else self.browse()
+            rows = Db._execute(
+                "SELECT id FROM radusergroup WHERE username = %s ORDER BY id DESC LIMIT %s",
+                (vals_list[0]['username'], len(vals_list)),
+            )
+            return self.browse([r['id'] for r in rows])
+        return self.browse()
 
     def unlink(self):
+        Db = self.env['todd.radius.db']
         for rec in self:
-            self.env['todd.radius.db']._execute_write(
+            Db._execute_write(
                 "DELETE FROM radusergroup WHERE username = %s AND groupname = %s AND priority = %s",
-                (rec.username, rec.groupname, rec.priority)
-            )
-            self.env.cr.execute(
-                "DELETE FROM todd_radius_radusergroup WHERE username = %s AND groupname = %s AND priority = %s",
-                (rec.username, rec.groupname, rec.priority)
+                (rec.username, rec.groupname, rec.priority),
             )
         return True
 
     def name_get(self):
-        result = []
-        for rec in self:
-            result.append((rec.id, f"{rec.username} → {rec.groupname} ({rec.priority})"))
-        return result
+        return [(rec.id, f"{rec.username} → {rec.groupname} ({rec.priority})") for rec in self]
