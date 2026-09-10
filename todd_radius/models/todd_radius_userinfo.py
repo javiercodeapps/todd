@@ -45,6 +45,7 @@ class ToddRadiusUserinfo(models.Model):
     is_online = fields.Boolean(string='Online', compute='_compute_online')
 
     def init(self):
+        self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_userinfo CASCADE")
         self.env.cr.execute("""
             CREATE OR REPLACE VIEW todd_radius_userinfo AS
             SELECT 1 AS id, NULL::varchar AS username, NULL::varchar AS firstname,

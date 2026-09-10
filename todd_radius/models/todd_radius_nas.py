@@ -21,6 +21,7 @@ class ToddRadiusNas(models.Model):
     description = fields.Char(string='Descripción')
 
     def init(self):
+        self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_nas CASCADE")
         self.env.cr.execute("""
             CREATE OR REPLACE VIEW todd_radius_nas AS
             SELECT 1 AS id, NULL::varchar AS nasname, NULL::varchar AS shortname,

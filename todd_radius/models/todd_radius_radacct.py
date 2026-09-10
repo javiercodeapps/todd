@@ -35,6 +35,7 @@ class ToddRadiusRadacct(models.Model):
     framedipaddress = fields.Char(string='IP Framed')
 
     def init(self):
+        self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_radacct CASCADE")
         self.env.cr.execute("""
             CREATE OR REPLACE VIEW todd_radius_radacct AS
             SELECT 1 AS id, NULL::varchar AS acctsessionid, NULL::varchar AS acctuniqueid,
