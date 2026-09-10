@@ -17,6 +17,7 @@ class ToddRadiusRadpostauth(models.Model):
     authdate = fields.Datetime(string='Fecha Auth')
 
     def init(self):
+        self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_radpostauth CASCADE")
         self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_radpostauth CASCADE")
         self.env.cr.execute("""
             CREATE OR REPLACE VIEW todd_radius_radpostauth AS
