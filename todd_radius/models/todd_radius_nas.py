@@ -32,6 +32,23 @@ class ToddRadiusNas(models.Model):
             WHERE FALSE
         """)
 
+    def search_read(self, domain=None, fields=None, offset=0, limit=None, order=None):
+        Db = self.env['todd.radius.db']
+        query = "SELECT * FROM nas WHERE 1=1"
+        params = []
+        for leaf in (domain or []):
+            if leaf[0] == 'nasname' and leaf[1] == 'ilike':
+                query += " AND nasname LIKE %s"
+                params.append(f'%{leaf[2]}%')
+        if order:
+            query += f" ORDER BY {order}"
+        if limit:
+            query += f" LIMIT {limit}"
+        if offset:
+            query += f" OFFSET {offset}"
+        rows = Db._execute(query, tuple(params) if params else None)
+        return [{'id': r.get('id') or r.get('radacctid'), **{k: v for k, v in r.items() if k != 'id'}} for r in rows]
+
     def search(self, args=None, offset=0, limit=None, order=None):
         args = args or []
         Db = self.env['todd.radius.db']
