@@ -5,17 +5,10 @@ from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
-FIELDS_MAP = {
-    'radius_id': 'id', 'username': 'username', 'firstname': 'firstname',
-    'lastname': 'lastname', 'email': 'email', 'department': 'department',
-    'company': 'company', 'workphone': 'workphone', 'homephone': 'homephone',
-    'mobilephone': 'mobilephone', 'address': 'address', 'notes': 'notes',
-    'city': 'city', 'state': 'state', 'country': 'country', 'zip': 'zip',
-    'changeuserinfo': 'changeuserinfo', 'enableportallogin': 'enableportallogin',
-    'tv': 'tv', 'tvuser': 'tvuser', 'tvpass': 'tvpass',
-    'portalloginpassword': 'portalloginpassword', 'creationdate': 'creationdate',
-    'updatedate': 'updatedate', 'creationby': 'creationby', 'updateby': 'updateby',
-}
+FDW_TABLES = [
+    'userinfo', 'radcheck', 'radreply', 'radusergroup',
+    'radacct', 'radpostauth', 'nas', 'radippool',
+]
 
 
 class ToddRadiusUserinfo(models.Model):
@@ -58,80 +51,15 @@ class ToddRadiusUserinfo(models.Model):
 
     def init(self):
         self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_userinfo CASCADE")
-        self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_userinfo CASCADE")
-        cols = ', '.join(f"NULL::varchar AS {k}" for k in FIELDS_MAP.keys())
-        self.env.cr.execute(f"""
+        self.env.cr.execute("""
             CREATE OR REPLACE VIEW todd_radius_userinfo AS
-            SELECT 1 AS id, {cols} WHERE FALSE
+            SELECT id AS radius_id, username, firstname, lastname, email, department, company,
+                   workphone, homephone, mobilephone, address, notes, city, state, country, zip,
+                   changeuserinfo::boolean, enableportallogin::boolean, tv::boolean,
+                   tvuser, tvpass, portalloginpassword,
+                   creationdate, updatedate, creationby, updateby
+            FROM userinfo
         """)
-
-    def _mysql_query(self, args=None, order=None, limit=None, offset=None):
-        Db = self.env['todd.radius.db']
-        query = "SELECT id, username, firstname, lastname, email, department, company, workphone, homephone, mobilephone, address, notes, city, state, country, zip, changeuserinfo, enableportallogin, tv, tvuser, tvpass, portalloginpassword, creationdate, updatedate, creationby, updateby FROM userinfo WHERE 1=1"
-        params = []
-        for leaf in (args or []):
-            if leaf[0] == 'username' and leaf[1] == 'ilike':
-                query += " AND username LIKE %s"
-                params.append(f'%{leaf[2]}%')
-            elif leaf[0] == 'firstname' and leaf[1] == 'ilike':
-                query += " AND firstname LIKE %s"
-                params.append(f'%{leaf[2]}%')
-            elif leaf[0] == 'lastname' and leaf[1] == 'ilike':
-                query += " AND lastname LIKE %s"
-                params.append(f'%{leaf[2]}%')
-            elif leaf[0] == 'company' and leaf[1] == 'ilike':
-                query += " AND company LIKE %s"
-                params.append(f'%{leaf[2]}%')
-        if order:
-            query += f" ORDER BY {order}"
-        if limit:
-            query += f" LIMIT {limit}"
-        if offset:
-            query += f" OFFSET {offset}"
-        return Db._execute(query, tuple(params) if params else None)
-
-    def search_read(self, domain=None, fields=None, offset=0, limit=None, order=None):
-        _logger.warning('TODD RADIUS: search_read called domain=%s limit=%s', domain, limit)
-        try:
-            rows = self._mysql_query(args=domain, order=order, limit=limit, offset=offset)
-            _logger.warning('TODD RADIUS: search_read MySQL returned %s rows', len(rows))
-        except Exception as e:
-            _logger.error('TODD RADIUS: search_read ERROR: %s', e)
-            return []
-        result = []
-        for row in rows:
-            rec = {'id': row['id']}
-            for odoo_field, mysql_col in FIELDS_MAP.items():
-                val = row.get(mysql_col)
-                if odoo_field in ('changeuserinfo', 'enableportallogin', 'tv'):
-                    val = val in ('1', 1, True)
-                rec[odoo_field] = val
-            result.append(rec)
-        return result
-
-    def search(self, args=None, offset=0, limit=None, order=None):
-        rows = self._mysql_query(args=args, order=order, limit=limit, offset=offset)
-        return self.browse([r['id'] for r in rows])
-
-    def read(self, fields=None, load='_classic_read'):
-        if not self.ids:
-            return []
-        Db = self.env['todd.radius.db']
-        placeholders = ','.join(['%s'] * len(self.ids))
-        rows = Db._execute(
-            f"SELECT id, username, firstname, lastname, email, department, company, workphone, homephone, mobilephone, address, notes, city, state, country, zip, changeuserinfo, enableportallogin, tv, tvuser, tvpass, portalloginpassword, creationdate, updatedate, creationby, updateby FROM userinfo WHERE id IN ({placeholders})",
-            tuple(self.ids),
-        )
-        rows_by_id = {r['id']: r for r in rows}
-        result = []
-        for rec in self:
-            data = rows_by_id.get(rec.id, {})
-            data['id'] = rec.id
-            for f in ('changeuserinfo', 'enableportallogin', 'tv'):
-                if f in data:
-                    data[f] = data[f] in ('1', 1, True)
-            result.append(data)
-        return result
 
     def _compute_password(self):
         Db = self.env['todd.radius.db']
@@ -183,6 +111,53 @@ class ToddRadiusUserinfo(models.Model):
                 (rec.username,),
             )
             rec.is_online = bool(rows)
+
+    @api.model
+    def action_setup_fdw(self):
+        config = self.env['ir.config_parameter'].sudo()
+        host = config.get_param('todd.radius.db_host', '10.0.2.12')
+        port = config.get_param('todd.radius.db_port', '3306')
+        user = config.get_param('todd.radius.db_user', 'radius-gestion')
+        password = config.get_param('todd.radius.db_password', 'p4Bl1c')
+        database = config.get_param('todd.radius.db_name', 'radius')
+
+        try:
+            self.env.cr.execute("CREATE EXTENSION IF NOT EXISTS mysql_fdw")
+        except Exception as e:
+            raise UserError(f'No se pudo crear mysql_fdw. Ejecute como superuser:\nCREATE EXTENSION IF NOT EXISTS mysql_fdw;\n\nError: {e}')
+
+        try:
+            self.env.cr.execute("DROP SERVER IF EXISTS radius_mysql CASCADE")
+            self.env.cr.execute("""
+                CREATE SERVER radius_mysql
+                FOREIGN DATA WRAPPER mysql_fdw
+                OPTIONS (host %s, port %s)
+            """, (host, port))
+        except Exception as e:
+            raise UserError(f'Error creando server FDW: {e}')
+
+        try:
+            self.env.cr.execute("DROP USER MAPPING IF EXISTS CURRENT_USER SERVER radius_mysql")
+            self.env.cr.execute("""
+                CREATE USER MAPPING FOR CURRENT_USER
+                SERVER radius_mysql
+                OPTIONS (username %s, password %s)
+            """, (user, password))
+        except Exception as e:
+            raise UserError(f'Error creando user mapping: {e}')
+
+        try:
+            self.env.cr.execute(f"""
+                IMPORT FOREIGN SCHEMA {database}
+                LIMIT TO ({', '.join(FDW_TABLES)})
+                FROM SERVER radius_mysql
+                INTO public
+            """)
+        except Exception as e:
+            _logger.warning('TODD RADIUS: IMPORT FOREIGN SCHEMA falló (puede que ya existan): %s', e)
+
+        _logger.warning('TODD RADIUS: FDW setup completado')
+        raise UserError('FDW configurado correctamente. Las tablas MySQL están disponibles como tablas PostgreSQL.')
 
     def action_test_connection(self):
         ok = self.env['todd.radius.db']._test_connection()

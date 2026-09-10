@@ -1,8 +1,4 @@
-import logging
-
 from odoo import api, fields, models
-
-_logger = logging.getLogger(__name__)
 
 
 class ToddRadiusRadacct(models.Model):
@@ -36,67 +32,16 @@ class ToddRadiusRadacct(models.Model):
 
     def init(self):
         self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_radacct CASCADE")
-        self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_radacct CASCADE")
         self.env.cr.execute("""
             CREATE OR REPLACE VIEW todd_radius_radacct AS
-            SELECT 1 AS id, NULL::varchar AS acctsessionid, NULL::varchar AS acctuniqueid,
-                   NULL::varchar AS username, NULL::varchar AS groupname, NULL::varchar AS realm,
-                   NULL::varchar AS nasipaddress, NULL::varchar AS nasportid,
-                   NULL::varchar AS nasporttype, NULL::timestamp AS acctstarttime,
-                   NULL::timestamp AS acctstoptime, NULL::integer AS acctsessiontime,
-                   NULL::varchar AS acctauthentic, NULL::varchar AS connectinfo_start,
-                   NULL::varchar AS connectinfo_stop, NULL::integer AS acctinputoctets,
-                   NULL::integer AS acctoutputoctets, NULL::varchar AS calledstationid,
-                   NULL::varchar AS callingstationid, NULL::varchar AS acctterminatecause,
-                   NULL::varchar AS servicetype, NULL::varchar AS framedprotocol,
-                   NULL::varchar AS framedipaddress, NULL::integer AS radacctid
-            WHERE FALSE
+            SELECT radacctid AS id, radacctid, acctsessionid, acctuniqueid,
+                   username, groupname, realm, nasipaddress, nasportid, nasporttype,
+                   acctstarttime, acctstoptime, acctsessiontime, acctauthentic,
+                   connectinfo_start, connectinfo_stop, acctinputoctets, acctoutputoctets,
+                   calledstationid, callingstationid, acctterminatecause, servicetype,
+                   framedprotocol, framedipaddress
+            FROM radacct
         """)
-
-    def search_read(self, domain=None, fields=None, offset=0, limit=None, order=None):
-        Db = self.env['todd.radius.db']
-        query = "SELECT *, radacctid AS id FROM radacct WHERE 1=1"
-        params = []
-        for leaf in (domain or []):
-            if leaf[0] == 'username' and leaf[1] == '=':
-                query += " AND username = %s"
-                params.append(leaf[2])
-        if order:
-            query += f" ORDER BY {order}"
-        if limit:
-            query += f" LIMIT {limit}"
-        if offset:
-            query += f" OFFSET {offset}"
-        rows = Db._execute(query, tuple(params) if params else None)
-        return [{'id': r.get('id') or r.get('radacctid'), **{k: v for k, v in r.items() if k != 'id'}} for r in rows]
-
-    def search(self, args=None, offset=0, limit=None, order=None):
-        args = args or []
-        Db = self.env['todd.radius.db']
-        query = "SELECT radacctid AS id FROM radacct WHERE 1=1"
-        params = []
-        for leaf in args:
-            if leaf[0] == 'username' and leaf[1] == '=':
-                query += " AND username = %s"
-                params.append(leaf[2])
-        if order:
-            query += f" ORDER BY {order}"
-        if limit:
-            query += f" LIMIT {limit}"
-        rows = Db._execute(query, tuple(params) if params else None)
-        return self.browse([r['id'] for r in rows])
-
-    def read(self, fields=None, load='_classic_read'):
-        if not self.ids:
-            return []
-        Db = self.env['todd.radius.db']
-        placeholders = ','.join(['%s'] * len(self.ids))
-        rows = Db._execute(
-            f"SELECT *, radacctid AS id FROM radacct WHERE radacctid IN ({placeholders})",
-            tuple(self.ids),
-        )
-        rows_by_id = {r['id']: r for r in rows}
-        return [{'id': rec.id, **rows_by_id.get(rec.id, {})} for rec in self]
 
     def name_get(self):
         result = []

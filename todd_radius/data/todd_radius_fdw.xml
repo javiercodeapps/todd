@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Setup FDW para conectar a MySQL RADIUS.
+         Solo se ejecuta una vez (noupdate=1).
+         Requiere: CREATE EXTENSION IF NOT EXISTS mysql_fdw; (ejecutar como superuser) -->
+    <record id="ir_cron_todd_radius_fdw_setup" model="ir.cron">
+        <field name="name">Todd Radius: Setup FDW (una vez)</field>
+        <field name="model_id" ref="model_todd_radius_userinfo"/>
+        <field name="state">code</field>
+        <field name="code">model.action_setup_fdw()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active">False</field>
+        <field name="numbercall">1</field>
+    </record>
+</odoo>
