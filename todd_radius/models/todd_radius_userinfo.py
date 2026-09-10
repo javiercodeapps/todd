@@ -92,8 +92,12 @@ class ToddRadiusUserinfo(models.Model):
 
     def search_read(self, domain=None, fields=None, offset=0, limit=None, order=None):
         _logger.warning('TODD RADIUS: search_read called domain=%s limit=%s', domain, limit)
-        rows = self._mysql_query(args=domain, order=order, limit=limit, offset=offset)
-        _logger.warning('TODD RADIUS: search_read MySQL returned %s rows', len(rows))
+        try:
+            rows = self._mysql_query(args=domain, order=order, limit=limit, offset=offset)
+            _logger.warning('TODD RADIUS: search_read MySQL returned %s rows', len(rows))
+        except Exception as e:
+            _logger.error('TODD RADIUS: search_read ERROR: %s', e)
+            return []
         result = []
         for row in rows:
             rec = {'id': row['id']}
