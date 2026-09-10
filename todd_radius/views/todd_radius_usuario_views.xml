@@ -9,6 +9,8 @@
                 <header>
                     <button name="action_test_connection" type="object"
                             string="Test Conexión" class="oe_highlight"/>
+                    <button name="action_diagnostico" type="object"
+                            string="Diagnóstico"/>
                 </header>
                 <sheet>
                     <group>

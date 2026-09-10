@@ -188,6 +188,44 @@ class ToddRadiusUserinfo(models.Model):
         ok = self.env['todd.radius.db']._test_connection()
         raise UserError('Conexión MySQL OK' if ok else 'Fallo conexión. Revise todd.radius.db_* en Parámetros del Sistema')
 
+    @api.model
+    def action_diagnostico(self):
+        _logger.warning('TODD RADIUS: === INICIO DIAGNOSTICO ===')
+        try:
+            driver_name, driver = _get_mysql_driver()
+            _logger.warning('TODD RADIUS: Driver: %s', driver_name)
+        except Exception as e:
+            _logger.error('TODD RADIUS: Error importando driver: %s', e)
+            raise UserError(f'Error driver: {e}')
+
+        try:
+            cfg = self.env['todd.radius.db']._get_config()
+            _logger.warning('TODD RADIUS: Config: %s', cfg)
+        except Exception as e:
+            _logger.error('TODD RADIUS: Error leyendo config: %s', e)
+            raise UserError(f'Error config: {e}')
+
+        try:
+            rows = self.env['todd.radius.db']._execute("SELECT COUNT(*) AS total FROM userinfo")
+            total = rows[0]['total'] if rows else 0
+            _logger.warning('TODD RADIUS: Total usuarios en MySQL: %s', total)
+        except Exception as e:
+            _logger.error('TODD RADIUS: Error consultando MySQL: %s', e)
+            raise UserError(f'Error MySQL: {e}')
+
+        try:
+            sample = self.env['todd.radius.db']._execute("SELECT id, username, firstname, lastname FROM userinfo LIMIT 5")
+            _logger.warning('TODD RADIUS: Muestra: %s', sample)
+        except Exception as e:
+            _logger.error('TODD RADIUS: Error en muestra: %s', e)
+            sample = []
+
+        msg = f"Driver: {driver_name}\nTotal usuarios: {total}\n\nMuestra:\n"
+        for r in sample:
+            msg += f"  {r.get('id')}: {r.get('username')} - {r.get('firstname')} {r.get('lastname')}\n"
+        _logger.warning('TODD RADIUS: === FIN DIAGNOSTICO ===')
+        raise UserError(msg)
+
     def create(self, vals_list):
         Db = self.env['todd.radius.db']
         for vals in vals_list:

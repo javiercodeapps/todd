@@ -76,4 +76,18 @@
               sequence="10"
               groups="group_todd_radius_technical"/>
 
+    <!-- Diagnóstico -->
+    <record id="action_todd_radius_diagnostico" model="ir.actions.server">
+        <field name="name">Diagnóstico RADIUS</field>
+        <field name="model_id" ref="model_todd_radius_userinfo"/>
+        <field name="code">model.action_diagnostico()</field>
+    </record>
+
+    <menuitem id="menu_todd_radius_diagnostico"
+              name="Diagnóstico"
+              parent="menu_todd_radius_root"
+              sequence="99"
+              action="action_todd_radius_diagnostico"
+              groups="group_todd_radius_manager"/>
+
 </odoo>
