@@ -10,7 +10,7 @@
                     <button name="action_procesar" type="object"
                             string="Procesar" class="oe_highlight"/>
                     <button name="action_desconectar_todos" type="object"
-                            string="Desconectar Todos"/>
+                            string="Desconectar Todos" invisible="pendiente == False"/>
                 </header>
                 <sheet>
                     <group>

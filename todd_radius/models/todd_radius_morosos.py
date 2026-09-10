@@ -78,6 +78,25 @@ class ToddRadiusMorosos(models.Model):
             _logger.error('TODD RADIUS: Error desconectando %s: %s', username, e)
             raise
 
+    def action_desconectar_todos(self):
+        Db = self.env['todd.radius.db']
+        for rec in self:
+            rows = Db._execute(
+                "SELECT username FROM radacct WHERE acctstoptime IS NULL"
+            )
+            resultados = []
+            for row in rows:
+                username = row.get('username')
+                if username:
+                    try:
+                        self.action_desconectar(username)
+                        resultados.append(f"{username}: desconectado")
+                    except Exception as e:
+                        resultados.append(f"{username}: error - {e}")
+            rec.write({
+                'resultado': '\n'.join(resultados) if resultados else 'No hay usuarios conectados',
+            })
+
     def name_get(self):
         result = []
         for rec in self:
