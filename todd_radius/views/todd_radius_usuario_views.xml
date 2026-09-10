@@ -52,7 +52,7 @@
         <field name="name">todd.radius.userinfo.list</field>
         <field name="model">todd.radius.userinfo</field>
         <field name="arch" type="xml">
-            <list decoration-success="is_online == True" decoration-danger="is_online == False">
+            <list>
                 <field name="username"/>
                 <field name="firstname"/>
                 <field name="lastname"/>
@@ -74,10 +74,6 @@
                 <field name="firstname"/>
                 <field name="lastname"/>
                 <field name="company"/>
-                <filter name="online" string="En línea"
-                        domain="[('is_online', '=', True)]"/>
-                <filter name="offline" string="Desconectado"
-                        domain="[('is_online', '=', False)]"/>
             </search>
         </field>
     </record>
