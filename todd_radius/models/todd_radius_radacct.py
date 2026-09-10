@@ -32,16 +32,34 @@ class ToddRadiusRadacct(models.Model):
 
     def init(self):
         self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_radacct CASCADE")
-        self.env.cr.execute("""
-            CREATE OR REPLACE VIEW todd_radius_radacct AS
-            SELECT radacctid AS id, radacctid, acctsessionid, acctuniqueid,
-                   username, groupname, realm, nasipaddress, nasportid, nasporttype,
-                   acctstarttime, acctstoptime, acctsessiontime, acctauthentic,
-                   connectinfo_start, connectinfo_stop, acctinputoctets, acctoutputoctets,
-                   calledstationid, callingstationid, acctterminatecause, servicetype,
-                   framedprotocol, framedipaddress
-            FROM radacct
-        """)
+        try:
+            self.env.cr.execute("""
+                CREATE OR REPLACE VIEW todd_radius_radacct AS
+                SELECT radacctid AS id, radacctid, acctsessionid, acctuniqueid,
+                       username, groupname, realm, nasipaddress, nasportid, nasporttype,
+                       acctstarttime, acctstoptime, acctsessiontime, acctauthentic,
+                       connectinfo_start, connectinfo_stop, acctinputoctets, acctoutputoctets,
+                       calledstationid, callingstationid, acctterminatecause, servicetype,
+                       framedprotocol, framedipaddress
+                FROM radacct
+            """)
+        except Exception:
+            self.env.cr.execute("""
+                CREATE OR REPLACE VIEW todd_radius_radacct AS
+                SELECT 1 AS id, 1 AS radacctid, NULL::varchar AS acctsessionid,
+                       NULL::varchar AS acctuniqueid, NULL::varchar AS username,
+                       NULL::varchar AS groupname, NULL::varchar AS realm,
+                       NULL::varchar AS nasipaddress, NULL::varchar AS nasportid,
+                       NULL::varchar AS nasporttype, NULL::timestamp AS acctstarttime,
+                       NULL::timestamp AS acctstoptime, 0 AS acctsessiontime,
+                       NULL::varchar AS acctauthentic, NULL::varchar AS connectinfo_start,
+                       NULL::varchar AS connectinfo_stop, 0 AS acctinputoctets,
+                       0 AS acctoutputoctets, NULL::varchar AS calledstationid,
+                       NULL::varchar AS callingstationid, NULL::varchar AS acctterminatecause,
+                       NULL::varchar AS servicetype, NULL::varchar AS framedprotocol,
+                       NULL::varchar AS framedipaddress
+                WHERE FALSE
+            """)
 
     def name_get(self):
         result = []

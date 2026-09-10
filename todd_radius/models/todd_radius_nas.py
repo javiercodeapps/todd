@@ -18,12 +18,22 @@ class ToddRadiusNas(models.Model):
 
     def init(self):
         self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_nas CASCADE")
-        self.env.cr.execute("""
-            CREATE OR REPLACE VIEW todd_radius_nas AS
-            SELECT id AS radius_id, id, nasname, shortname, type, ports,
-                   secret, server, community, description
-            FROM nas
-        """)
+        try:
+            self.env.cr.execute("""
+                CREATE OR REPLACE VIEW todd_radius_nas AS
+                SELECT id AS radius_id, id, nasname, shortname, type, ports,
+                       secret, server, community, description
+                FROM nas
+            """)
+        except Exception:
+            self.env.cr.execute("""
+                CREATE OR REPLACE VIEW todd_radius_nas AS
+                SELECT 1 AS radius_id, 1 AS id, NULL::varchar AS nasname,
+                       NULL::varchar AS shortname, NULL::varchar AS type, 0 AS ports,
+                       NULL::varchar AS secret, NULL::varchar AS server,
+                       NULL::varchar AS community, NULL::varchar AS description
+                WHERE FALSE
+            """)
 
     def create(self, vals_list):
         Db = self.env['todd.radius.db']

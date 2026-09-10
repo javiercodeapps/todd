@@ -12,11 +12,18 @@ class ToddRadiusRadusergroup(models.Model):
 
     def init(self):
         self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_radusergroup CASCADE")
-        self.env.cr.execute("""
-            CREATE OR REPLACE VIEW todd_radius_radusergroup AS
-            SELECT id, username, groupname, priority
-            FROM radusergroup
-        """)
+        try:
+            self.env.cr.execute("""
+                CREATE OR REPLACE VIEW todd_radius_radusergroup AS
+                SELECT id, username, groupname, priority
+                FROM radusergroup
+            """)
+        except Exception:
+            self.env.cr.execute("""
+                CREATE OR REPLACE VIEW todd_radius_radusergroup AS
+                SELECT 1 AS id, NULL::varchar AS username, NULL::varchar AS groupname, 0 AS priority
+                WHERE FALSE
+            """)
 
     def create(self, vals_list):
         Db = self.env['todd.radius.db']

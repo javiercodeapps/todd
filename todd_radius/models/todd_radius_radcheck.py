@@ -14,11 +14,19 @@ class ToddRadiusRadcheck(models.Model):
 
     def init(self):
         self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_radcheck CASCADE")
-        self.env.cr.execute("""
-            CREATE OR REPLACE VIEW todd_radius_radcheck AS
-            SELECT id AS radius_id, id, username, attribute, op, value
-            FROM radcheck
-        """)
+        try:
+            self.env.cr.execute("""
+                CREATE OR REPLACE VIEW todd_radius_radcheck AS
+                SELECT id AS radius_id, id, username, attribute, op, value
+                FROM radcheck
+            """)
+        except Exception:
+            self.env.cr.execute("""
+                CREATE OR REPLACE VIEW todd_radius_radcheck AS
+                SELECT 1 AS radius_id, 1 AS id, NULL::varchar AS username,
+                       NULL::varchar AS attribute, NULL::varchar AS op, NULL::varchar AS value
+                WHERE FALSE
+            """)
 
     def create(self, vals_list):
         Db = self.env['todd.radius.db']

@@ -18,12 +18,23 @@ class ToddRadiusRadippool(models.Model):
 
     def init(self):
         self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_radippool CASCADE")
-        self.env.cr.execute("""
-            CREATE OR REPLACE VIEW todd_radius_radippool AS
-            SELECT id AS radius_id, id, pool_name, framedipaddress, nasipaddress,
-                   calledstationid, callingstationid, expiry_time, username, pool_key
-            FROM radippool
-        """)
+        try:
+            self.env.cr.execute("""
+                CREATE OR REPLACE VIEW todd_radius_radippool AS
+                SELECT id AS radius_id, id, pool_name, framedipaddress, nasipaddress,
+                       calledstationid, callingstationid, expiry_time, username, pool_key
+                FROM radippool
+            """)
+        except Exception:
+            self.env.cr.execute("""
+                CREATE OR REPLACE VIEW todd_radius_radippool AS
+                SELECT 1 AS radius_id, 1 AS id, NULL::varchar AS pool_name,
+                       NULL::varchar AS framedipaddress, NULL::varchar AS nasipaddress,
+                       NULL::varchar AS calledstationid, NULL::varchar AS callingstationid,
+                       NULL::timestamp AS expiry_time, NULL::varchar AS username,
+                       NULL::varchar AS pool_key
+                WHERE FALSE
+            """)
 
     def name_get(self):
         return [(rec.id, f"{rec.pool_name}: {rec.framedipaddress}") for rec in self]

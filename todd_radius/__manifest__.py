@@ -1,6 +1,6 @@
 {
     'name': "Todd Radius",
-    'version': '19.0.2.0.0',
+    'version': '19.0.2.1.0',
     'depends': ['base', 'portal'],
     'author': "Todd",
     'category': 'Network',
