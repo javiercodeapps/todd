@@ -61,7 +61,7 @@ class ToddRadiusUserinfo(models.Model):
         if fdw_ready:
             self.env.cr.execute("""
                 CREATE OR REPLACE VIEW todd_radius_userinfo AS
-                SELECT id AS radius_id, username, firstname, lastname, email, department, company,
+                SELECT id, id AS radius_id, username, firstname, lastname, email, department, company,
                        workphone, homephone, mobilephone, address, notes, city, state, country, zip,
                        changeuserinfo::boolean, enableportallogin::boolean, tv::boolean,
                        tvuser, tvpass, portalloginpassword,
