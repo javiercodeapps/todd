@@ -22,7 +22,7 @@ class ToddRadiusRadusergroup(models.Model):
         if fdw_ready:
             self.env.cr.execute("""
                 CREATE OR REPLACE VIEW todd_radius_radusergroup AS
-                SELECT id, username, groupname, priority
+                SELECT ROW_NUMBER() OVER () AS id, username, groupname, priority
                 FROM radusergroup
             """)
         else:
@@ -39,12 +39,6 @@ class ToddRadiusRadusergroup(models.Model):
                 "INSERT INTO radusergroup (username, groupname, priority) VALUES (%s, %s, %s)",
                 (vals.get('username'), vals.get('groupname'), vals.get('priority', 0)),
             )
-        if vals_list:
-            rows = Db._execute(
-                "SELECT id FROM radusergroup WHERE username = %s ORDER BY id DESC LIMIT %s",
-                (vals_list[0]['username'], len(vals_list)),
-            )
-            return self.browse([r['id'] for r in rows])
         return self.browse()
 
     def unlink(self):
