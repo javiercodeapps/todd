@@ -13,6 +13,7 @@
                         <tr>
                             <th>Factura</th>
                             <th>Servicio</th>
+                            <th>Domicilio</th>
                             <th>Período</th>
                             <th>Fecha</th>
                             <th>Vencimiento</th>
@@ -33,6 +34,7 @@
                                     <t t-elif="f.servicio == 'S'"><span class="rounded px-2 py-1" style="background-color:#9B59B6;color:#fff;">Sepelio</span></t>
                                     <t t-elif="f.servicio == 'N'"><span class="rounded px-2 py-1" style="background-color:#F39C12;color:#fff;">Nichos</span></t>
                                 </td>
+                                <td><t t-esc="f.domicilio"/></td>
                                 <td><t t-if="f.periodo and len(f.periodo) == 6"><t t-out="f.periodo[4:6]"/>/<t t-out="f.periodo[0:4]"/></t></td>
                                 <td><t t-esc="f.fecha_emision" t-options="{'widget':'date'}"/></td>
                                 <td><t t-esc="f.fecha_vencimiento" t-options="{'widget':'date'}"/></td>
