@@ -47,6 +47,7 @@ class ToddFactura(models.Model):
     importe_2do_vencimiento = fields.Float(string='Importe 2do Venc.', digits=(12, 2))
     codigo_estado = fields.Char(string='Código Estado')
     dni = fields.Char(string='DNI')
+    usuario = fields.Char(string='Usuario')
     archivo_pdf_ruta = fields.Char(string='Ruta PDF')
     pdf_disponible = fields.Boolean(string='PDF Disponible', compute='_compute_pdf_disponible')
 

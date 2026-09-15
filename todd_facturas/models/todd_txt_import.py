@@ -94,7 +94,7 @@ class ToddTxtImport(models.Model):
     @api.model
     def _parse_linea_txt(self, linea, line_num):
         c = [x.strip() for x in linea.split(';')]
-        if len(c) < 17:
+        if len(c) < 18:
             return None
         return {
             'nro_socio': c[0],
@@ -114,6 +114,7 @@ class ToddTxtImport(models.Model):
             'servicio': c[14],
             'importe_2do_venc': float(c[15].replace(',', '.')) if c[15].strip() else 0,
             'dni': c[17].strip() if len(c) > 17 else '',
+            'usuario': c[18].strip() if len(c) > 18 else '',
             'line_num': line_num,
         }
 
@@ -128,6 +129,7 @@ class ToddTxtImport(models.Model):
                 'name': lp['nombre'],
                 'todd_nro_socio': lp['nro_socio'],
                 'todd_nro_usuario': lp['nro_usuario'],
+                'todd_usuario': lp.get('usuario', ''),
                 'street': lp['domicilio'],
                 'vat': dni if dni and dni != '0' else False,
             }
@@ -139,6 +141,14 @@ class ToddTxtImport(models.Model):
                 partner = Partner.search([('todd_nro_socio', '=', lp['nro_socio'])], limit=1)
                 if not partner:
                     raise
+        else:
+            updates = {}
+            if not partner.todd_usuario and lp.get('usuario'):
+                updates['todd_usuario'] = lp['usuario']
+            if not partner.todd_nro_usuario and lp.get('nro_usuario'):
+                updates['todd_nro_usuario'] = lp['nro_usuario']
+            if updates:
+                partner.write(updates)
         partner.crear_usuario_portal_si_no_tiene()
         return partner, created
 
@@ -192,6 +202,7 @@ class ToddTxtImport(models.Model):
                     'servicio': lp['servicio'],
                     'importe_2do_vencimiento': lp['importe_2do_venc'],
                     'dni': lp['dni'],
+                    'usuario': lp.get('usuario', ''),
                     'archivo_pdf_ruta': pdf_ruta,
                 })
             return 'created'

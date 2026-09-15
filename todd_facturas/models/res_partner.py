@@ -14,6 +14,27 @@ class ResPartner(models.Model):
 
     todd_nro_socio = fields.Char(string='Nro. Socio')
     todd_nro_usuario = fields.Char(string='Nro. Usuario')
+    todd_usuario = fields.Char(string='Usuario Todd')
+    todd_facturas_count = fields.Integer(string='Facturas Todd', compute='_compute_todd_facturas_count')
+
+    def _compute_todd_facturas_count(self):
+        for partner in self:
+            partner.todd_facturas_count = self.env['todd.factura'].search_count([
+                ('partner_id', '=', partner.id)
+            ])
+
+    def action_ver_facturas(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': f'Facturas Todd - {self.name}',
+            'res_model': 'todd.factura',
+            'view_mode': 'list,form',
+            'domain': [('partner_id', '=', self.id)],
+            'context': {'default_partner_id': self.id},
+        }
+    todd_usuario = fields.Char(string='Usuario Todd')
+    todd_facturas_count = fields.Integer(string='Facturas Todd', compute='_compute_todd_facturas_count')
 
     def _tiene_grupo_portal(self, user):
         """Verificar si un usuario tiene el grupo portal via SQL"""

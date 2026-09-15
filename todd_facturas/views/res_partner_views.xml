@@ -5,11 +5,22 @@
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
+            <xpath expr="//div[hasclass('oe_button_box')]" position="inside">
+                <button class="oe_stat_button" type="object"
+                        name="action_ver_facturas"
+                        icon="fa-file-text-o"
+                        invisible="todd_nro_socio == False">
+                    <field name="todd_facturas_count" widget="statinfo" string="Facturas Todd"/>
+                </button>
+            </xpath>
             <xpath expr="//page[@name='internal_notes']" position="after">
                 <page string="Todd" name="todd">
                     <group>
-                        <field name="todd_nro_socio"/>
-                        <field name="todd_nro_usuario"/>
+                        <group string="Datos Todd">
+                            <field name="todd_nro_socio"/>
+                            <field name="todd_nro_usuario"/>
+                            <field name="todd_usuario"/>
+                        </group>
                     </group>
                     <button name="action_crear_usuario_portal" string="Crear Usuario Portal"
                             type="object" class="btn-primary"

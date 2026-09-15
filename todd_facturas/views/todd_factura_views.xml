@@ -27,6 +27,7 @@
                         <group string="Datos">
                             <field name="domicilio"/>
                             <field name="dni"/>
+                            <field name="usuario"/>
                             <field name="archivo_pdf"/>
                             <field name="archivo_pdf_ruta"/>
                             <field name="pdf_disponible"/>
@@ -54,6 +55,7 @@
                 <field name="fecha_vencimiento"/>
                 <field name="importe"/>
                 <field name="servicio"/>
+                <field name="usuario"/>
                 <field name="estado_pago"/>
                 <field name="pdf_disponible"/>
             </list>
