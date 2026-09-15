@@ -29,6 +29,7 @@
                                     <field name="nro_socio"/>
                                     <field name="nro_usuario"/>
                                     <field name="nombre_usuario"/>
+                                    <field name="domicilio"/>
                                 </list>
                             </field>
                         </group>

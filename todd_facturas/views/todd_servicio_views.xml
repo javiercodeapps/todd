@@ -13,6 +13,7 @@
                             <field name="nro_socio"/>
                             <field name="nro_usuario"/>
                             <field name="nombre_usuario"/>
+                            <field name="domicilio"/>
                         </group>
                         <group string="Facturas">
                             <button class="oe_stat_button" type="object"
@@ -37,6 +38,7 @@
                 <field name="nro_socio"/>
                 <field name="nro_usuario"/>
                 <field name="nombre_usuario"/>
+                <field name="domicilio"/>
                 <field name="facturas_count"/>
             </list>
         </field>

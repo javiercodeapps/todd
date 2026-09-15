@@ -19,6 +19,7 @@ class ToddServicio(models.Model):
     nro_socio = fields.Char(string='Nro. Socio', required=True, index=True)
     nro_usuario = fields.Char(string='Nro. Usuario')
     nombre_usuario = fields.Char(string='Nombre Usuario')
+    domicilio = fields.Char(string='Domicilio')
     facturas_count = fields.Integer(string='Facturas', compute='_compute_facturas_count')
 
     _rec_name = 'display_name'

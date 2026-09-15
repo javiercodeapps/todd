@@ -166,6 +166,7 @@ class ToddTxtImport(models.Model):
                 'nro_socio': lp['nro_socio'],
                 'nro_usuario': lp['nro_usuario'],
                 'nombre_usuario': lp.get('usuario', ''),
+                'domicilio': lp.get('domicilio', ''),
             }
             try:
                 with self.env.cr.savepoint():
@@ -185,6 +186,8 @@ class ToddTxtImport(models.Model):
                 updates['nro_usuario'] = lp['nro_usuario']
             if not servicio.nombre_usuario and lp.get('usuario'):
                 updates['nombre_usuario'] = lp['usuario']
+            if lp.get('domicilio') and servicio.domicilio != lp['domicilio']:
+                updates['domicilio'] = lp['domicilio']
             if updates:
                 servicio.write(updates)
 
