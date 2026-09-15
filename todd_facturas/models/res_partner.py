@@ -77,7 +77,7 @@ class ResPartner(models.Model):
             return {'type': 'ir.actions.client', 'tag': 'display_notification',
                     'params': {'title': 'Error', 'message': f'Ya existe usuario con login: {login}', 'type': 'danger'}}
 
-        user = self.env['res.users'].create({
+        user = self.env['res.users'].with_context(mail_create_nosubscribe=True).create({
             'name': self.name,
             'login': login,
             'password': login,
