@@ -125,7 +125,7 @@ class ResPartner(models.Model):
                 if not partner.lang:
                     partner.sudo().write({'lang': 'es_AR'})
 
-                user = self.env['res.users'].create({
+                user = self.env['res.users'].with_context(mail_create_nosubscribe=True).create({
                     'name': partner.name,
                     'login': login,
                     'password': login,
