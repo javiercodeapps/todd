@@ -223,7 +223,7 @@
                                             </div>
                                         </div>
 
-                                        <div class="col-12" t-if="factura.nro_usuario">
+                                        <div class="col-12" t-if="factura.servicio_id and factura.servicio_id.nro_usuario">
                                             <div class="card">
                                                 <div class="card-body">
                                                     <div class="row align-items-center">
@@ -242,7 +242,7 @@
                                                         </div>
                                                         <div class="col-md-6 text-center">
                                                             <div class="d-flex align-items-center justify-content-center gap-2 flex-wrap mb-3">
-                                                                <span class="fs-3 font-monospace" id="codigo_dni" t-esc="factura.nro_usuario"/>
+                                                                <span class="fs-3 font-monospace" id="codigo_dni" t-esc="factura.servicio_id.nro_usuario"/>
                                                                 <button type="button" class="btn btn-sm btn-outline-secondary"
                                                                         onclick="navigator.clipboard.writeText(document.getElementById('codigo_dni').innerText)">
                                                                     <i class="fa fa-copy"/> Copiar
@@ -255,7 +255,7 @@
                                             </div>
                                         </div>
 
-                                        <div class="col-12" t-if="factura.nro_usuario">
+                                        <div class="col-12" t-if="factura.servicio_id and factura.servicio_id.nro_usuario">
                                             <div class="card">
                                                 <div class="card-body text-center">
                                                     <i class="fa fa-link fa-3x text-primary mb-3"/>
@@ -263,7 +263,7 @@
                                                     <p class="text-muted">Home banking Credicoop, BIP y otros bancos de la red Link</p>
                                                     <p class="mb-2"><strong>Cód. LINK PAGO</strong></p>
                                                     <div class="d-flex align-items-center justify-content-center gap-2 flex-wrap">
-                                                        <span class="fs-3 font-monospace" id="codigo_link" t-esc="factura.nro_usuario"/>
+                                                        <span class="fs-3 font-monospace" id="codigo_link" t-esc="factura.servicio_id.nro_usuario"/>
                                                         <button type="button" class="btn btn-sm btn-outline-secondary"
                                                                 onclick="navigator.clipboard.writeText(document.getElementById('codigo_link').innerText)">
                                                             <i class="fa fa-copy"/> Copiar

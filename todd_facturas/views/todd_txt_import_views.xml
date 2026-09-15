@@ -32,6 +32,7 @@
                             <field name="facturas_creadas"/>
                             <field name="facturas_actualizadas"/>
                             <field name="partners_creados"/>
+                            <field name="servicios_creados"/>
                             <field name="errores"/>
                         </group>
                     </group>

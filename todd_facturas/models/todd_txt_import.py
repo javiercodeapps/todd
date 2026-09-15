@@ -31,6 +31,7 @@ class ToddTxtImport(models.Model):
     facturas_creadas = fields.Integer(string='Facturas Creadas', readonly=True)
     facturas_actualizadas = fields.Integer(string='Facturas Actualizadas', readonly=True)
     partners_creados = fields.Integer(string='Partners Creados', readonly=True)
+    servicios_creados = fields.Integer(string='Servicios Creados', readonly=True)
     usuarios_creados = fields.Integer(string='Usuarios Creados', readonly=True)
     errores = fields.Integer(string='Errores', readonly=True)
     log = fields.Text(string='Log', readonly=True)
@@ -121,15 +122,17 @@ class ToddTxtImport(models.Model):
     @api.model
     def _get_or_create_partner_todd(self, lp):
         Partner = self.env['res.partner']
-        partner = Partner.search([('todd_nro_socio', '=', lp['nro_socio'])], limit=1)
+        dni = lp['dni']
+
+        if dni and dni != '0':
+            partner = Partner.search([('vat', '=', dni)], limit=1)
+        else:
+            partner = Partner.browse()
+
         created = False
         if not partner:
-            dni = lp['dni']
             vals = {
                 'name': lp['nombre'],
-                'todd_nro_socio': lp['nro_socio'],
-                'todd_nro_usuario': lp['nro_usuario'],
-                'todd_usuario': lp.get('usuario', ''),
                 'street': lp['domicilio'],
                 'vat': dni if dni and dni != '0' else False,
             }
@@ -138,19 +141,54 @@ class ToddTxtImport(models.Model):
                     partner = Partner.create(vals)
                     created = True
             except Exception:
-                partner = Partner.search([('todd_nro_socio', '=', lp['nro_socio'])], limit=1)
+                if dni and dni != '0':
+                    partner = Partner.search([('vat', '=', dni)], limit=1)
                 if not partner:
+                    raise
+
+        partner.crear_usuario_portal_si_no_tiene()
+        return partner, created
+
+    @api.model
+    def _get_or_create_servicio(self, partner, lp):
+        Servicio = self.env['todd.servicio']
+        servicio = Servicio.search([
+            ('partner_id', '=', partner.id),
+            ('tipo', '=', lp['servicio']),
+            ('nro_socio', '=', lp['nro_socio']),
+        ], limit=1)
+
+        created = False
+        if not servicio:
+            vals = {
+                'partner_id': partner.id,
+                'tipo': lp['servicio'],
+                'nro_socio': lp['nro_socio'],
+                'nro_usuario': lp['nro_usuario'],
+                'nombre_usuario': lp.get('usuario', ''),
+            }
+            try:
+                with self.env.cr.savepoint():
+                    servicio = Servicio.create(vals)
+                    created = True
+            except Exception:
+                servicio = Servicio.search([
+                    ('partner_id', '=', partner.id),
+                    ('tipo', '=', lp['servicio']),
+                    ('nro_socio', '=', lp['nro_socio']),
+                ], limit=1)
+                if not servicio:
                     raise
         else:
             updates = {}
-            if not partner.todd_usuario and lp.get('usuario'):
-                updates['todd_usuario'] = lp['usuario']
-            if not partner.todd_nro_usuario and lp.get('nro_usuario'):
-                updates['todd_nro_usuario'] = lp['nro_usuario']
+            if not servicio.nro_usuario and lp.get('nro_usuario'):
+                updates['nro_usuario'] = lp['nro_usuario']
+            if not servicio.nombre_usuario and lp.get('usuario'):
+                updates['nombre_usuario'] = lp['usuario']
             if updates:
-                partner.write(updates)
-        partner.crear_usuario_portal_si_no_tiene()
-        return partner, created
+                servicio.write(updates)
+
+        return servicio, created
 
     @api.model
     def _pdf_ruta(self, source_dir, archivo_pdf):
@@ -173,6 +211,8 @@ class ToddTxtImport(models.Model):
             if pdf_ruta and existe.archivo_pdf_ruta != pdf_ruta:
                 vals['archivo_pdf'] = lp['archivo_pdf']
                 vals['archivo_pdf_ruta'] = pdf_ruta
+            if lp.get('servicio_id') and existe.servicio_id != lp['servicio_id']:
+                vals['servicio_id'] = lp['servicio_id']
             if vals:
                 existe.write(vals)
                 return 'updated'
@@ -186,8 +226,7 @@ class ToddTxtImport(models.Model):
             with self.env.cr.savepoint():
                 self.env['todd.factura'].create({
                     'partner_id': lp['partner_id'],
-                    'referencia': lp['nro_socio'],
-                    'nro_usuario': lp['nro_usuario'],
+                    'servicio_id': lp.get('servicio_id'),
                     'periodo': lp['periodo'],
                     'punto_venta': lp['pto_venta'],
                     'nro_factura': lp['nro_fac'],
@@ -202,7 +241,6 @@ class ToddTxtImport(models.Model):
                     'servicio': lp['servicio'],
                     'importe_2do_vencimiento': lp['importe_2do_venc'],
                     'dni': lp['dni'],
-                    'usuario': lp.get('usuario', ''),
                     'archivo_pdf_ruta': pdf_ruta,
                 })
             return 'created'
@@ -228,7 +266,7 @@ class ToddTxtImport(models.Model):
             'log': self._append_log([msg]),
         })
 
-    def _sumar_progreso(self, lineas_lote, omitidas, creadas, actualizadas, partners_nuevos, errores, log_lines, total):
+    def _sumar_progreso(self, lineas_lote, omitidas, creadas, actualizadas, partners_nuevos, servicios_nuevos, errores, log_lines, total):
         self.ensure_one()
         extra = '\n'.join(log_lines) if log_lines else ''
         self.env.cr.execute(
@@ -239,6 +277,7 @@ class ToddTxtImport(models.Model):
                 facturas_creadas = COALESCE(facturas_creadas, 0) + %s,
                 facturas_actualizadas = COALESCE(facturas_actualizadas, 0) + %s,
                 partners_creados = COALESCE(partners_creados, 0) + %s,
+                servicios_creados = COALESCE(servicios_creados, 0) + %s,
                 errores = COALESCE(errores, 0) + %s,
                 log = CASE
                     WHEN %s = '' THEN log
@@ -249,7 +288,7 @@ class ToddTxtImport(models.Model):
             RETURNING lineas_procesadas
             """,
             (
-                lineas_lote, omitidas, creadas, actualizadas, partners_nuevos, errores,
+                lineas_lote, omitidas, creadas, actualizadas, partners_nuevos, servicios_nuevos, errores,
                 extra, extra, self.id,
             ),
         )
@@ -307,6 +346,7 @@ class ToddTxtImport(models.Model):
             'facturas_creadas': 0,
             'facturas_actualizadas': 0,
             'partners_creados': 0,
+            'servicios_creados': 0,
             'errores': 0,
             'log': False,
         })
@@ -348,8 +388,9 @@ class ToddTxtImport(models.Model):
         end = min(end, len(lineas))
         source_dir = self._get_pdf_dir()
         log = [f'--- Lote líneas {start}-{end - 1} de {total} ---']
-        creadas = actualizadas = partners_nuevos = omitidas = errores = 0
+        creadas = actualizadas = partners_nuevos = servicios_nuevos = omitidas = errores = 0
         partners_map = {}
+        servicios_map = {}
         lineas_parseadas = []
 
         for i in range(start, end):
@@ -360,19 +401,45 @@ class ToddTxtImport(models.Model):
                     cols = len(lineas[i].split(';'))
                     log.append(f'Línea {i + 1}: omitida (columnas insuficientes: {cols})')
                     continue
-                if parsed['nro_socio'] not in partners_map:
+
+                dni = parsed['dni']
+                if dni and dni != '0' and dni not in partners_map:
                     try:
                         with self.env.cr.savepoint():
                             partner, created = self._get_or_create_partner_todd(parsed)
-                            partners_map[parsed['nro_socio']] = partner.id
+                            partners_map[dni] = partner.id
                             if created:
                                 partners_nuevos += 1
                     except Exception as e:
                         errores += 1
-                        log.append(f"Línea {i + 1}: ERROR partner {parsed['nro_socio']} - {e}")
+                        log.append(f"Línea {i + 1}: ERROR partner DNI {dni} - {e}")
                         _logger.exception('TODD: partner línea %s de %s', i + 1, self.filename)
                         continue
-                parsed['partner_id'] = partners_map[parsed['nro_socio']]
+
+                partner_id = partners_map.get(dni)
+                if not partner_id:
+                    errores += 1
+                    log.append(f"Línea {i + 1}: sin DNI válido, omitida")
+                    continue
+
+                svc_key = (partner_id, parsed['servicio'], parsed['nro_socio'])
+                if svc_key not in servicios_map:
+                    try:
+                        with self.env.cr.savepoint():
+                            servicio, svc_created = self._get_or_create_servicio(
+                                self.env['res.partner'].browse(partner_id), parsed,
+                            )
+                            servicios_map[svc_key] = servicio.id
+                            if svc_created:
+                                servicios_nuevos += 1
+                    except Exception as e:
+                        errores += 1
+                        log.append(f"Línea {i + 1}: ERROR servicio {parsed['nro_socio']} - {e}")
+                        _logger.exception('TODD: servicio línea %s de %s', i + 1, self.filename)
+                        continue
+
+                parsed['partner_id'] = partner_id
+                parsed['servicio_id'] = servicios_map[svc_key]
                 lineas_parseadas.append(parsed)
             except Exception as e:
                 errores += 1
@@ -393,5 +460,5 @@ class ToddTxtImport(models.Model):
                 _logger.exception('TODD: factura línea %s de %s', lp['line_num'], self.filename)
 
         self._sumar_progreso(
-            end - start, omitidas, creadas, actualizadas, partners_nuevos, errores, log, total,
+            end - start, omitidas, creadas, actualizadas, partners_nuevos, servicios_nuevos, errores, log, total,
         )

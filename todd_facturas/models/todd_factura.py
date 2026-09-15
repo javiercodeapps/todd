@@ -23,11 +23,10 @@ SERVICIOS = {
 class ToddFactura(models.Model):
     _name = 'todd.factura'
     _description = 'Factura Todd'
-    _order = 'fecha_emision desc, referencia'
+    _order = 'fecha_emision desc, id desc'
 
     partner_id = fields.Many2one('res.partner', string='Partner', required=True, index=True)
-    referencia = fields.Char(string='Referencia', index=True)
-    nro_usuario = fields.Char(string='Nro. Usuario')
+    servicio_id = fields.Many2one('todd.servicio', string='Servicio', index=True, ondelete='set null')
     periodo = fields.Char(string='Periodo', size=6)
     punto_venta = fields.Integer(string='Punto de Venta')
     nro_factura = fields.Integer(string='Nro. Factura', index=True)
@@ -38,16 +37,17 @@ class ToddFactura(models.Model):
     archivo_pdf = fields.Char(string='Archivo PDF')
     cod_pago_electronico = fields.Char(string='Cód. Pago Electrónico')
     cod_pago_electronico_otros = fields.Char(string='Cód. Pago Electrónico Otros')
-    estado_pago = fields.Selection([('pagado', 'Pagado'), ('adeudado', 'Adeudado')], string='Estado', default='adeudado', index=True)
+    estado_pago = fields.Selection([
+        ('pagado', 'Pagado'), ('adeudado', 'Adeudado'),
+    ], string='Estado', default='adeudado', index=True)
     domicilio = fields.Char(string='Domicilio')
     servicio = fields.Selection([
         ('E', 'Energía'), ('A', 'Agua'), ('T', 'Telefonía'),
-        ('I', 'Internet'), ('S', 'Sepelio'), ('N', 'Nichos')
-    ], string='Servicio', index=True)
+        ('I', 'Internet'), ('S', 'Sepelio'), ('N', 'Nichos'),
+    ], string='Tipo Servicio', index=True)
     importe_2do_vencimiento = fields.Float(string='Importe 2do Venc.', digits=(12, 2))
     codigo_estado = fields.Char(string='Código Estado')
     dni = fields.Char(string='DNI')
-    usuario = fields.Char(string='Usuario')
     archivo_pdf_ruta = fields.Char(string='Ruta PDF')
     pdf_disponible = fields.Boolean(string='PDF Disponible', compute='_compute_pdf_disponible')
 
@@ -79,11 +79,11 @@ class ToddFactura(models.Model):
         else:
             monto = self.importe
 
-        socio = partner.todd_nro_socio or self.referencia or '0'
+        dni = partner.vat or self.dni or '0'
         try:
-            document_number = '%08d' % int(socio)
+            document_number = '%08d' % int(dni)
         except (TypeError, ValueError):
-            document_number = str(socio).zfill(8)
+            document_number = str(dni).zfill(8)
 
         servicio_nombre = SERVICIOS.get(self.servicio, self.servicio or '')
         periodo = self.periodo or ''

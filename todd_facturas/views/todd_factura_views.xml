@@ -10,8 +10,7 @@
                         <group string="Factura">
                             <field name="numero_completo"/>
                             <field name="partner_id"/>
-                            <field name="referencia"/>
-                            <field name="nro_usuario"/>
+                            <field name="servicio_id"/>
                             <field name="periodo"/>
                             <field name="fecha_emision"/>
                             <field name="fecha_vencimiento"/>
@@ -27,7 +26,6 @@
                         <group string="Datos">
                             <field name="domicilio"/>
                             <field name="dni"/>
-                            <field name="usuario"/>
                             <field name="archivo_pdf"/>
                             <field name="archivo_pdf_ruta"/>
                             <field name="pdf_disponible"/>
@@ -50,12 +48,12 @@
             <list>
                 <field name="numero_completo"/>
                 <field name="partner_id"/>
+                <field name="servicio_id"/>
                 <field name="periodo"/>
                 <field name="fecha_emision"/>
                 <field name="fecha_vencimiento"/>
                 <field name="importe"/>
                 <field name="servicio"/>
-                <field name="usuario"/>
                 <field name="estado_pago"/>
                 <field name="pdf_disponible"/>
             </list>

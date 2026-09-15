@@ -12,13 +12,17 @@ class TestToddApiCliente(TransactionCase):
         cls.partner = cls.env['res.partner'].create({
             'name': 'PUCHIK NICOLAS',
             'vat': '30111222',
-            'todd_nro_socio': '107482',
-            'todd_nro_usuario': '010001904',
+        })
+        cls.servicio = cls.env['todd.servicio'].create({
+            'partner_id': cls.partner.id,
+            'tipo': 'I',
+            'nro_socio': '107482',
+            'nro_usuario': '010001904',
+            'nombre_usuario': 'puchiknicolas',
         })
         cls.factura = cls.env['todd.factura'].create({
             'partner_id': cls.partner.id,
-            'referencia': '107482',
-            'nro_usuario': '010001904',
+            'servicio_id': cls.servicio.id,
             'periodo': '202608',
             'punto_venta': 1,
             'nro_factura': 123,
@@ -53,8 +57,10 @@ class TestToddApiCliente(TransactionCase):
         mock_resp.status_code = 200
         mock_resp.json.return_value = {'plan': '10mb', 'estado': 'activo'}
         mock_get.return_value = mock_resp
-        data = self.env['res.partner'].todd_api_estado_cliente('107482')
-        self.assertEqual(data['partner']['nro_socio'], '107482')
+        data = self.env['res.partner'].todd_api_estado_cliente('30111222')
+        self.assertEqual(data['partner']['vat'], '30111222')
+        self.assertEqual(len(data['servicios']), 1)
+        self.assertEqual(data['servicios'][0]['nro_socio'], '107482')
         self.assertEqual(len(data['facturas']), 1)
         self.assertEqual(data['facturas'][0]['numero'], '0001-00000123')
         self.assertEqual(data['facturas'][0]['servicio_nombre'], 'Internet')

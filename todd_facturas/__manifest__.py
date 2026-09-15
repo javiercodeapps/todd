@@ -1,6 +1,6 @@
 {
     'name': "Todd Facturas",
-    'version': '19.0.1.2.0',
+    'version': '19.0.2.0.0',
     'depends': ['base', 'portal', 'queue_job'],
     'author': "Todd",
     'category': 'Accounting',
@@ -10,6 +10,7 @@
         'security/todd_security.xml',
         'security/ir.model.access.csv',
         'wizard/todd_import_wizard_views.xml',
+        'views/todd_servicio_views.xml',
         'views/todd_factura_views.xml',
         'views/todd_txt_import_views.xml',
         'views/res_partner_views.xml',

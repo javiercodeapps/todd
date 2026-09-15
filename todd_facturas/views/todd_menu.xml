@@ -5,6 +5,9 @@
     <menuitem id="menu_todd_facturas" name="Facturas" parent="menu_todd_root" sequence="10"/>
     <menuitem id="menu_todd_list" name="Listado" parent="menu_todd_facturas" action="action_todd_factura" sequence="10"/>
 
+    <menuitem id="menu_todd_servicios" name="Servicios" parent="menu_todd_root" sequence="15"/>
+    <menuitem id="menu_todd_servicio_list" name="Listado" parent="menu_todd_servicios" action="action_todd_servicio" sequence="10"/>
+
     <menuitem id="menu_todd_import" name="Importación" parent="menu_todd_root" sequence="20"/>
     <menuitem id="menu_todd_import_txt" name="Importar TXT" parent="menu_todd_import" action="action_todd_import_wizard" sequence="10"/>
     <menuitem id="menu_todd_control_txt" name="Control de Imports" parent="menu_todd_import" action="action_todd_txt_import" sequence="20"/>

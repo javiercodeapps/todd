@@ -7,24 +7,35 @@
         <field name="arch" type="xml">
             <xpath expr="//div[hasclass('oe_button_box')]" position="inside">
                 <button class="oe_stat_button" type="object"
+                        name="action_ver_servicios"
+                        icon="fa-wrench"
+                        invisible="servicios_count == 0">
+                    <field name="servicios_count" widget="statinfo" string="Servicios"/>
+                </button>
+                <button class="oe_stat_button" type="object"
                         name="action_ver_facturas"
                         icon="fa-file-text-o"
-                        invisible="todd_nro_socio == False">
-                    <field name="todd_facturas_count" widget="statinfo" string="Facturas Todd"/>
+                        invisible="facturas_todd_count == 0">
+                    <field name="facturas_todd_count" widget="statinfo" string="Facturas Todd"/>
                 </button>
             </xpath>
             <xpath expr="//page[@name='internal_notes']" position="after">
                 <page string="Todd" name="todd">
                     <group>
-                        <group string="Datos Todd">
-                            <field name="todd_nro_socio"/>
-                            <field name="todd_nro_usuario"/>
-                            <field name="todd_usuario"/>
+                        <group string="Servicios Todd">
+                            <field name="servicio_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <field name="tipo"/>
+                                    <field name="nro_socio"/>
+                                    <field name="nro_usuario"/>
+                                    <field name="nombre_usuario"/>
+                                </list>
+                            </field>
                         </group>
                     </group>
                     <button name="action_crear_usuario_portal" string="Crear Usuario Portal"
                             type="object" class="btn-primary"
-                            invisible="todd_nro_socio == False"/>
+                            invisible="vat == False"/>
                 </page>
             </xpath>
         </field>

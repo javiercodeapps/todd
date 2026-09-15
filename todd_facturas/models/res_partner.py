@@ -12,16 +12,32 @@ RADIUS_URL = 'https://radius-gestion.todd.com.ar/radius/user_info/data'
 class ResPartner(models.Model):
     _inherit = 'res.partner'
 
-    todd_nro_socio = fields.Char(string='Nro. Socio')
-    todd_nro_usuario = fields.Char(string='Nro. Usuario')
-    todd_usuario = fields.Char(string='Usuario Todd')
-    todd_facturas_count = fields.Integer(string='Facturas Todd', compute='_compute_todd_facturas_count')
+    servicio_ids = fields.One2many('todd.servicio', 'partner_id', string='Servicios Todd')
+    servicios_count = fields.Integer(string='Servicios', compute='_compute_servicios_count')
+    facturas_todd_count = fields.Integer(string='Facturas Todd', compute='_compute_facturas_todd_count')
 
-    def _compute_todd_facturas_count(self):
+    def _compute_servicios_count(self):
         for partner in self:
-            partner.todd_facturas_count = self.env['todd.factura'].search_count([
+            partner.servicios_count = self.env['todd.servicio'].search_count([
                 ('partner_id', '=', partner.id)
             ])
+
+    def _compute_facturas_todd_count(self):
+        for partner in self:
+            partner.facturas_todd_count = self.env['todd.factura'].search_count([
+                ('partner_id', '=', partner.id)
+            ])
+
+    def action_ver_servicios(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': f'Servicios Todd - {self.name}',
+            'res_model': 'todd.servicio',
+            'view_mode': 'list,form',
+            'domain': [('partner_id', '=', self.id)],
+            'context': {'default_partner_id': self.id},
+        }
 
     def action_ver_facturas(self):
         self.ensure_one()
@@ -33,11 +49,8 @@ class ResPartner(models.Model):
             'domain': [('partner_id', '=', self.id)],
             'context': {'default_partner_id': self.id},
         }
-    todd_usuario = fields.Char(string='Usuario Todd')
-    todd_facturas_count = fields.Integer(string='Facturas Todd', compute='_compute_todd_facturas_count')
 
     def _tiene_grupo_portal(self, user):
-        """Verificar si un usuario tiene el grupo portal via SQL"""
         portal_group = self.env.ref('base.group_portal')
         self.env.cr.execute(
             "SELECT 1 FROM res_groups_users_rel WHERE gid = %s AND uid = %s",
@@ -46,7 +59,6 @@ class ResPartner(models.Model):
         return bool(self.env.cr.fetchone())
 
     def action_crear_usuario_portal(self):
-        """Crear usuario de portal para este partner"""
         self.ensure_one()
         portal_group = self.env.ref('base.group_portal')
 
@@ -56,26 +68,23 @@ class ResPartner(models.Model):
                 return {'type': 'ir.actions.client', 'tag': 'display_notification',
                         'params': {'title': 'Info', 'message': f'Ya tiene usuario portal: {user.login}', 'type': 'info'}}
 
-        login = self.vat or self.todd_nro_socio
+        login = self.vat
         if not login:
             return {'type': 'ir.actions.client', 'tag': 'display_notification',
-                    'params': {'title': 'Error', 'message': 'No tiene DNI/Nro Socio definido', 'type': 'danger'}}
+                    'params': {'title': 'Error', 'message': 'No tiene DNI definido', 'type': 'danger'}}
 
         if self.env['res.users'].search([('login', '=', login)], limit=1):
             return {'type': 'ir.actions.client', 'tag': 'display_notification',
                     'params': {'title': 'Error', 'message': f'Ya existe usuario con login: {login}', 'type': 'danger'}}
 
-        password = self.vat or self.todd_nro_socio
-
         user = self.env['res.users'].create({
             'name': self.name,
             'login': login,
-            'password': password,
+            'password': login,
             'partner_id': self.id,
             'share': True,
         })
 
-        # Solo grupo portal, quitar otros
         self.env.cr.execute(
             "DELETE FROM res_groups_users_rel WHERE uid = %s AND gid != %s",
             (user.id, portal_group.id)
@@ -84,7 +93,6 @@ class ResPartner(models.Model):
             "INSERT INTO res_groups_users_rel (gid, uid) VALUES (%s, %s) ON CONFLICT DO NOTHING",
             (portal_group.id, user.id)
         )
-        # Asegurar share=True via SQL
         self.env.cr.execute(
             "UPDATE res_users SET share=true WHERE id=%s",
             (user.id,)
@@ -94,7 +102,6 @@ class ResPartner(models.Model):
                 'params': {'title': 'Éxito', 'message': f'Usuario portal creado: {login}', 'type': 'success'}}
 
     def crear_usuario_portal_si_no_tiene(self):
-        """Crea usuario portal si no tiene - login y password = DNI"""
         portal_group = self.env.ref('base.group_portal')
         for partner in self:
             users = self.env['res.users'].search([('partner_id', '=', partner.id)])
@@ -109,26 +116,23 @@ class ResPartner(models.Model):
                     break
 
             if not tiene_portal:
-                login = partner.vat or partner.todd_nro_socio
+                login = partner.vat
                 if not login:
                     continue
                 if self.env['res.users'].search([('login', '=', login)], limit=1):
                     continue
 
-                # Asegurar idioma del partner
                 if not partner.lang:
                     partner.sudo().write({'lang': 'es_AR'})
 
-                password = login
                 user = self.env['res.users'].create({
                     'name': partner.name,
                     'login': login,
-                    'password': password,
+                    'password': login,
                     'partner_id': partner.id,
                     'share': True,
                 })
 
-                # Solo grupo portal, quitar otros
                 self.env.cr.execute(
                     "DELETE FROM res_groups_users_rel WHERE uid = %s AND gid != %s",
                     (user.id, portal_group.id)
@@ -137,7 +141,6 @@ class ResPartner(models.Model):
                     "INSERT INTO res_groups_users_rel (gid, uid) VALUES (%s, %s) ON CONFLICT DO NOTHING",
                     (portal_group.id, user.id)
                 )
-                # Asegurar share=True via SQL
                 self.env.cr.execute(
                     "UPDATE res_users SET share=true WHERE id=%s",
                     (user.id,)
@@ -162,19 +165,22 @@ class ResPartner(models.Model):
         variantes = self._todd_variantes_numero(numero)
         if not variantes:
             return self.browse()
-        partner = self.search([
-            '|', '|',
-            ('todd_nro_socio', 'in', variantes),
-            ('todd_nro_usuario', 'in', variantes),
-            ('vat', 'in', variantes),
-        ], limit=1)
+
+        partner = self.search([('vat', 'in', variantes)], limit=1)
         if partner:
             return partner
-        factura = self.env['todd.factura'].search([
-            '|', '|',
-            ('dni', 'in', variantes),
+
+        Servicio = self.env['todd.servicio']
+        servicio = Servicio.search([
+            '|',
+            ('nro_socio', 'in', variantes),
             ('nro_usuario', 'in', variantes),
-            ('referencia', 'in', variantes),
+        ], limit=1)
+        if servicio:
+            return servicio.partner_id
+
+        factura = self.env['todd.factura'].search([
+            ('dni', 'in', variantes),
         ], limit=1)
         return factura.partner_id
 
@@ -225,20 +231,31 @@ class ResPartner(models.Model):
             limit=limit,
         )
         seleccion = dict(self.env['todd.factura']._fields['servicio'].selection)
-        radius, radius_error = self._todd_consultar_radius(partner.todd_nro_socio or numero)
+
+        servicios = self.env['todd.servicio'].search([
+            ('partner_id', '=', partner.id),
+        ])
+        radius, radius_error = self._todd_consultar_radius(partner.vat or numero)
         return {
             'partner': {
                 'id': partner.id,
                 'name': partner.name,
                 'vat': partner.vat or False,
-                'nro_socio': partner.todd_nro_socio or False,
-                'nro_usuario': partner.todd_nro_usuario or False,
             },
+            'servicios': [{
+                'id': s.id,
+                'tipo': s.tipo,
+                'tipo_nombre': seleccion.get(s.tipo, s.tipo),
+                'nro_socio': s.nro_socio,
+                'nro_usuario': s.nro_usuario,
+                'nombre_usuario': s.nombre_usuario,
+            } for s in servicios],
             'facturas': [{
                 'id': f.id,
                 'numero': f.numero_completo,
                 'servicio': f.servicio,
                 'servicio_nombre': seleccion.get(f.servicio, f.servicio),
+                'servicio_id': f.servicio_id.id if f.servicio_id else False,
                 'periodo': f.periodo,
                 'fecha_emision': f.fecha_emision.isoformat() if f.fecha_emision else False,
                 'fecha_vencimiento': f.fecha_vencimiento.isoformat() if f.fecha_vencimiento else False,
@@ -246,7 +263,6 @@ class ResPartner(models.Model):
                 'importe_2do_vencimiento': f.importe_2do_vencimiento,
                 'estado_pago': f.estado_pago,
                 'domicilio': f.domicilio,
-                'nro_usuario': f.nro_usuario,
             } for f in facturas],
             'radius': radius,
             'radius_error': radius_error,

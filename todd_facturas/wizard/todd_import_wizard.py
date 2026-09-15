@@ -35,6 +35,7 @@ class ToddImportWizard(models.TransientModel):
         log = []
         total = ok = actualizadas = errores = omitidas = 0
         partners_map = {}
+        servicios_map = {}
 
         for i, linea in enumerate(lineas[1:], 2):
             if not linea.strip():
@@ -47,11 +48,29 @@ class ToddImportWizard(models.TransientModel):
                     cols = len(linea.split(';'))
                     log.append(f'Línea {i}: omitida (columnas insuficientes: {cols})')
                     continue
-                if parsed['nro_socio'] not in partners_map:
+
+                dni = parsed['dni']
+                if dni and dni != '0' and dni not in partners_map:
                     with self.env.cr.savepoint():
                         partner, _created = importer._get_or_create_partner_todd(parsed)
-                        partners_map[parsed['nro_socio']] = partner.id
-                parsed['partner_id'] = partners_map[parsed['nro_socio']]
+                        partners_map[dni] = partner.id
+
+                partner_id = partners_map.get(dni)
+                if not partner_id:
+                    errores += 1
+                    log.append(f"Línea {i}: sin DNI válido, omitida")
+                    continue
+
+                svc_key = (partner_id, parsed['servicio'], parsed['nro_socio'])
+                if svc_key not in servicios_map:
+                    with self.env.cr.savepoint():
+                        servicio, _svc_created = importer._get_or_create_servicio(
+                            self.env['res.partner'].browse(partner_id), parsed,
+                        )
+                        servicios_map[svc_key] = servicio.id
+
+                parsed['partner_id'] = partner_id
+                parsed['servicio_id'] = servicios_map[svc_key]
                 with self.env.cr.savepoint():
                     status = importer._crear_o_actualizar_factura(parsed, source_dir)
                 if status == 'created':

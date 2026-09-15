@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_todd_servicio_form" model="ir.ui.view">
+        <field name="name">todd.servicio.form</field>
+        <field name="model">todd.servicio</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group string="Servicio">
+                            <field name="partner_id"/>
+                            <field name="tipo"/>
+                            <field name="nro_socio"/>
+                            <field name="nro_usuario"/>
+                            <field name="nombre_usuario"/>
+                        </group>
+                        <group string="Facturas">
+                            <button class="oe_stat_button" type="object"
+                                    name="action_ver_facturas"
+                                    icon="fa-file-text-o">
+                                <field name="facturas_count" widget="statinfo" string="Facturas"/>
+                            </button>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_todd_servicio_list" model="ir.ui.view">
+        <field name="name">todd.servicio.list</field>
+        <field name="model">todd.servicio</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="partner_id"/>
+                <field name="tipo"/>
+                <field name="nro_socio"/>
+                <field name="nro_usuario"/>
+                <field name="nombre_usuario"/>
+                <field name="facturas_count"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_todd_servicio" model="ir.actions.act_window">
+        <field name="name">Servicios Todd</field>
+        <field name="res_model">todd.servicio</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>
