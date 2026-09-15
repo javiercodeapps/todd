@@ -216,6 +216,42 @@ class ResPartner(models.Model):
             _logger.exception('Radius consulta falló para %s', numero_cliente)
             return False, 'No se pudo conectar con Radius'
 
+    def _todd_consultar_radius_servicios(self):
+        config = self.env['ir.config_parameter'].sudo()
+        api_key = (config.get_param('todd.radius_api_key') or '').strip()
+        base = (config.get_param('todd.radius_url', RADIUS_URL) or RADIUS_URL).strip().rstrip('/')
+        if not api_key:
+            return {}
+
+        serviciosInternet = self.env['todd.servicio'].search([
+            ('partner_id', 'in', self.ids),
+            ('tipo', '=', 'I'),
+            ('nombre_usuario', '!=', False),
+        ])
+
+        resultados = {}
+        for svc in serviciosInternet:
+            try:
+                response = requests.get(
+                    f'{base}/{svc.nombre_usuario}',
+                    headers={'X-Api-Key': api_key, 'Accept': 'application/json'},
+                    params={'apikey': api_key},
+                    timeout=15,
+                )
+                try:
+                    data = response.json()
+                except ValueError:
+                    data = {'error': f'Radius status {response.status_code}'}
+                if response.status_code >= 400:
+                    error = data.get('error') or data.get('message') or f'Radius status {response.status_code}'
+                    resultados[svc.id] = {'data': data, 'error': error}
+                else:
+                    resultados[svc.id] = {'data': data, 'error': False}
+            except Exception:
+                _logger.exception('Radius consulta falló para servicio %s (%s)', svc.id, svc.nombre_usuario)
+                resultados[svc.id] = {'data': False, 'error': 'No se pudo conectar con Radius'}
+        return resultados
+
     @api.model
     def todd_api_estado_cliente(self, numero, limit=20):
         try:
@@ -235,21 +271,30 @@ class ResPartner(models.Model):
         servicios = self.env['todd.servicio'].search([
             ('partner_id', '=', partner.id),
         ])
-        radius, radius_error = self._todd_consultar_radius(partner.vat or numero)
-        return {
-            'partner': {
-                'id': partner.id,
-                'name': partner.name,
-                'vat': partner.vat or False,
-            },
-            'servicios': [{
+        radius_resultados = partner._todd_consultar_radius_servicios()
+
+        servicios_data = []
+        for s in servicios:
+            svc_info = {
                 'id': s.id,
                 'tipo': s.tipo,
                 'tipo_nombre': seleccion.get(s.tipo, s.tipo),
                 'nro_socio': s.nro_socio,
                 'nro_usuario': s.nro_usuario,
                 'nombre_usuario': s.nombre_usuario,
-            } for s in servicios],
+            }
+            if s.tipo == 'I' and s.id in radius_resultados:
+                svc_info['radius'] = radius_resultados[s.id]['data']
+                svc_info['radius_error'] = radius_resultados[s.id]['error']
+            servicios_data.append(svc_info)
+
+        return {
+            'partner': {
+                'id': partner.id,
+                'name': partner.name,
+                'vat': partner.vat or False,
+            },
+            'servicios': servicios_data,
             'facturas': [{
                 'id': f.id,
                 'numero': f.numero_completo,
@@ -264,6 +309,4 @@ class ResPartner(models.Model):
                 'estado_pago': f.estado_pago,
                 'domicilio': f.domicilio,
             } for f in facturas],
-            'radius': radius,
-            'radius_error': radius_error,
         }
