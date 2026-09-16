@@ -61,7 +61,7 @@ class ToddImportWizard(models.TransientModel):
                     log.append(f"Línea {i}: sin DNI válido, omitida")
                     continue
 
-                svc_key = (partner_id, parsed['servicio'], parsed['nro_socio'])
+                svc_key = (partner_id, parsed['servicio'], parsed['nro_usuario'])
                 if svc_key not in servicios_map:
                     with self.env.cr.savepoint():
                         servicio, _svc_created = importer._get_or_create_servicio(

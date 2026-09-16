@@ -6,8 +6,8 @@ class ToddServicio(models.Model):
     _description = 'Servicio Todd'
     _order = 'tipo, nro_socio'
     _sql_constraints = [
-        ('unique_servicio', 'unique(partner_id, tipo, nro_socio)',
-         'Ya existe un servicio de este tipo con ese número de socio para este partner.'),
+        ('unique_servicio', 'unique(partner_id, tipo, nro_usuario)',
+         'Ya existe un servicio de este tipo con ese número de usuario para este partner.'),
     ]
 
     partner_id = fields.Many2one('res.partner', string='Partner', required=True, index=True,

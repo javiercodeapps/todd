@@ -155,7 +155,7 @@ class ToddTxtImport(models.Model):
         servicio = Servicio.search([
             ('partner_id', '=', partner.id),
             ('tipo', '=', lp['servicio']),
-            ('nro_socio', '=', lp['nro_socio']),
+            ('nro_usuario', '=', lp['nro_usuario']),
         ], limit=1)
 
         created = False
@@ -176,14 +176,14 @@ class ToddTxtImport(models.Model):
                 servicio = Servicio.search([
                     ('partner_id', '=', partner.id),
                     ('tipo', '=', lp['servicio']),
-                    ('nro_socio', '=', lp['nro_socio']),
+                    ('nro_usuario', '=', lp['nro_usuario']),
                 ], limit=1)
                 if not servicio:
                     raise
         else:
             updates = {}
-            if not servicio.nro_usuario and lp.get('nro_usuario'):
-                updates['nro_usuario'] = lp['nro_usuario']
+            if lp.get('nro_socio') and servicio.nro_socio != lp['nro_socio']:
+                updates['nro_socio'] = lp['nro_socio']
             if not servicio.nombre_usuario and lp.get('usuario'):
                 updates['nombre_usuario'] = lp['usuario']
             if lp.get('domicilio') and servicio.domicilio != lp['domicilio']:
@@ -425,7 +425,7 @@ class ToddTxtImport(models.Model):
                     log.append(f"Línea {i + 1}: sin DNI válido, omitida")
                     continue
 
-                svc_key = (partner_id, parsed['servicio'], parsed['nro_socio'])
+                svc_key = (partner_id, parsed['servicio'], parsed['nro_usuario'])
                 if svc_key not in servicios_map:
                     try:
                         with self.env.cr.savepoint():
