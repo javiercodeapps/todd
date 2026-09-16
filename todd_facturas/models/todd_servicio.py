@@ -6,7 +6,7 @@ class ToddServicio(models.Model):
     _description = 'Servicio Todd'
     _order = 'tipo, nro_socio'
 
-    unique_servicio = models.Constraint('''
+    _unique_servicio = models.Constraint('''
         UNIQUE(partner_id, tipo, nro_usuario)
     ''', 'Ya existe un servicio de este tipo con ese número de usuario para este partner.')
 
