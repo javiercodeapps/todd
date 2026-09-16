@@ -5,10 +5,10 @@ class ToddServicio(models.Model):
     _name = 'todd.servicio'
     _description = 'Servicio Todd'
     _order = 'tipo, nro_socio'
-    _sql_constraints = [
-        ('unique_servicio', 'unique(partner_id, tipo, nro_usuario)',
-         'Ya existe un servicio de este tipo con ese número de usuario para este partner.'),
-    ]
+
+    unique_servicio = models.Constraint('''
+        UNIQUE(partner_id, tipo, nro_usuario)
+    ''', 'Ya existe un servicio de este tipo con ese número de usuario para este partner.')
 
     partner_id = fields.Many2one('res.partner', string='Partner', required=True, index=True,
                                  ondelete='cascade')
