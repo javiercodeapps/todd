@@ -1,9 +1,14 @@
+import logging
+
 from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 class ToddRadiusRadippool(models.Model):
     _name = 'todd.radius.radippool'
     _auto = False
+    _inherit = ['todd.radius.db']
     _description = 'Pool de IPs RADIUS'
 
     radius_id = fields.Integer(string='ID', readonly=True)
@@ -19,29 +24,48 @@ class ToddRadiusRadippool(models.Model):
     def init(self):
         self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_radippool CASCADE")
         self.env.cr.execute("""
-            SELECT EXISTS (
-                SELECT 1 FROM information_schema.foreign_tables
-                WHERE foreign_table_name = 'radippool'
+            CREATE TABLE IF NOT EXISTS todd_radius_radippool (
+                id SERIAL PRIMARY KEY,
+                radius_id INTEGER,
+                pool_name VARCHAR(255),
+                framedipaddress VARCHAR(255),
+                nasipaddress VARCHAR(255),
+                calledstationid VARCHAR(255),
+                callingstationid VARCHAR(255),
+                expiry_time TIMESTAMP,
+                username VARCHAR(255),
+                pool_key VARCHAR(255)
             )
         """)
-        fdw_ready = self.env.cr.fetchone()[0]
-        if fdw_ready:
-            self.env.cr.execute("""
-                CREATE OR REPLACE VIEW todd_radius_radippool AS
-                SELECT id AS radius_id, id, pool_name, framedipaddress, nasipaddress,
-                       calledstationid, callingstationid, expiry_time, username, pool_key
-                FROM radippool
-            """)
-        else:
-            self.env.cr.execute("""
-                CREATE OR REPLACE VIEW todd_radius_radippool AS
-                SELECT 1 AS radius_id, 1 AS id, NULL::varchar AS pool_name,
-                       NULL::varchar AS framedipaddress, NULL::varchar AS nasipaddress,
-                       NULL::varchar AS calledstationid, NULL::varchar AS callingstationid,
-                       NULL::timestamp AS expiry_time, NULL::varchar AS username,
-                       NULL::varchar AS pool_key
-                WHERE FALSE
-            """)
+
+    def _sync_from_mysql(self):
+        Db = self.env['todd.radius.db']
+        try:
+            rows = Db._execute("SELECT * FROM radippool")
+        except Exception as e:
+            _logger.error('TODD RADIUS: Error syncing radippool from MySQL: %s', e)
+            return
+
+        self.env.cr.execute("DELETE FROM todd_radius_radippool")
+        if rows:
+            cols = [
+                'pool_name', 'framedipaddress', 'nasipaddress',
+                'calledstationid', 'callingstationid', 'expiry_time', 'username', 'pool_key',
+            ]
+            col_names = ', '.join(['id'] + cols)
+            placeholders = ', '.join(['%s'] * (len(cols) + 1))
+            values = [
+                tuple([r.get('id')] + [r.get(c) for c in cols])
+                for r in rows
+            ]
+            self.env.cr.executemany(
+                f"INSERT INTO todd_radius_radippool ({col_names}) VALUES ({placeholders})",
+                values,
+            )
+
+    def search(self, args, offset=0, limit=None, order=None, count=False):
+        self._sync_from_mysql()
+        return super().search(args, offset=offset, limit=limit, order=order, count=count)
 
     def name_get(self):
         return [(rec.id, f"{rec.pool_name}: {rec.framedipaddress}") for rec in self]

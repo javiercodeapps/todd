@@ -1,9 +1,14 @@
+import logging
+
 from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 class ToddRadiusNas(models.Model):
     _name = 'todd.radius.nas'
     _auto = False
+    _inherit = ['todd.radius.db']
     _description = 'Dispositivos NAS'
 
     radius_id = fields.Integer(string='ID', readonly=True)
@@ -19,28 +24,45 @@ class ToddRadiusNas(models.Model):
     def init(self):
         self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_nas CASCADE")
         self.env.cr.execute("""
-            SELECT EXISTS (
-                SELECT 1 FROM information_schema.foreign_tables
-                WHERE foreign_table_name = 'nas'
+            CREATE TABLE IF NOT EXISTS todd_radius_nas (
+                id SERIAL PRIMARY KEY,
+                radius_id INTEGER,
+                nasname VARCHAR(255),
+                shortname VARCHAR(255),
+                type VARCHAR(255),
+                ports INTEGER,
+                secret VARCHAR(255),
+                server VARCHAR(255),
+                community VARCHAR(255),
+                description VARCHAR(255)
             )
         """)
-        fdw_ready = self.env.cr.fetchone()[0]
-        if fdw_ready:
-            self.env.cr.execute("""
-                CREATE OR REPLACE VIEW todd_radius_nas AS
-                SELECT id AS radius_id, id, nasname, shortname, type, ports,
-                       secret, server, community, description
-                FROM nas
-            """)
-        else:
-            self.env.cr.execute("""
-                CREATE OR REPLACE VIEW todd_radius_nas AS
-                SELECT 1 AS radius_id, 1 AS id, NULL::varchar AS nasname,
-                       NULL::varchar AS shortname, NULL::varchar AS type, 0 AS ports,
-                       NULL::varchar AS secret, NULL::varchar AS server,
-                       NULL::varchar AS community, NULL::varchar AS description
-                WHERE FALSE
-            """)
+
+    def _sync_from_mysql(self):
+        Db = self.env['todd.radius.db']
+        try:
+            rows = Db._execute("SELECT * FROM nas")
+        except Exception as e:
+            _logger.error('TODD RADIUS: Error syncing nas from MySQL: %s', e)
+            return
+
+        self.env.cr.execute("DELETE FROM todd_radius_nas")
+        if rows:
+            cols = ['nasname', 'shortname', 'type', 'ports', 'secret', 'server', 'community', 'description']
+            col_names = ', '.join(['id'] + cols)
+            placeholders = ', '.join(['%s'] * (len(cols) + 1))
+            values = [
+                tuple([r.get('id')] + [r.get(c) for c in cols])
+                for r in rows
+            ]
+            self.env.cr.executemany(
+                f"INSERT INTO todd_radius_nas ({col_names}) VALUES ({placeholders})",
+                values,
+            )
+
+    def search(self, args, offset=0, limit=None, order=None, count=False):
+        self._sync_from_mysql()
+        return super().search(args, offset=offset, limit=limit, order=order, count=count)
 
     def create(self, vals_list):
         Db = self.env['todd.radius.db']

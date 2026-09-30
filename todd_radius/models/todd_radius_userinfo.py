@@ -5,15 +5,11 @@ from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
-FDW_TABLES = [
-    'userinfo', 'radcheck', 'radreply', 'radusergroup',
-    'radacct', 'radpostauth', 'nas', 'radippool',
-]
-
 
 class ToddRadiusUserinfo(models.Model):
     _name = 'todd.radius.userinfo'
     _auto = False
+    _inherit = ['todd.radius.db']
     _description = 'Usuario RADIUS'
     _order = 'username'
 
@@ -52,36 +48,70 @@ class ToddRadiusUserinfo(models.Model):
     def init(self):
         self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_userinfo CASCADE")
         self.env.cr.execute("""
-            SELECT EXISTS (
-                SELECT 1 FROM information_schema.foreign_tables
-                WHERE foreign_table_name = 'userinfo'
+            CREATE TABLE IF NOT EXISTS todd_radius_userinfo (
+                id SERIAL PRIMARY KEY,
+                radius_id INTEGER,
+                username VARCHAR(255),
+                firstname VARCHAR(255),
+                lastname VARCHAR(255),
+                email VARCHAR(255),
+                department VARCHAR(255),
+                company VARCHAR(255),
+                workphone VARCHAR(255),
+                homephone VARCHAR(255),
+                mobilephone VARCHAR(255),
+                address TEXT,
+                notes TEXT,
+                city VARCHAR(255),
+                state VARCHAR(255),
+                country VARCHAR(255),
+                zip VARCHAR(255),
+                changeuserinfo BOOLEAN,
+                enableportallogin BOOLEAN,
+                tv BOOLEAN,
+                tvuser VARCHAR(255),
+                tvpass VARCHAR(255),
+                portalloginpassword VARCHAR(255),
+                creationdate TIMESTAMP,
+                updatedate TIMESTAMP,
+                creationby VARCHAR(255),
+                updateby VARCHAR(255)
             )
         """)
-        fdw_ready = self.env.cr.fetchone()[0]
-        if fdw_ready:
-            self.env.cr.execute("""
-                CREATE OR REPLACE VIEW todd_radius_userinfo AS
-                SELECT id, id AS radius_id, username, firstname, lastname, email, department, company,
-                       workphone, homephone, mobilephone, address, notes, city, state, country, zip,
-                       changeuserinfo::boolean, enableportallogin::boolean, tv::boolean,
-                       tvuser, tvpass, portalloginpassword,
-                       creationdate, updatedate, creationby, updateby
-                FROM userinfo
-            """)
-        else:
-            self.env.cr.execute("""
-                CREATE OR REPLACE VIEW todd_radius_userinfo AS
-                SELECT 1 AS radius_id, NULL::varchar AS username, NULL::varchar AS firstname,
-                       NULL::varchar AS lastname, NULL::varchar AS email, NULL::varchar AS department,
-                       NULL::varchar AS company, NULL::varchar AS workphone, NULL::varchar AS homephone,
-                       NULL::varchar AS mobilephone, NULL::text AS address, NULL::text AS notes,
-                       NULL::varchar AS city, NULL::varchar AS state, NULL::varchar AS country,
-                       NULL::varchar AS zip, FALSE AS changeuserinfo, FALSE AS enableportallogin,
-                       FALSE AS tv, NULL::varchar AS tvuser, NULL::varchar AS tvpass,
-                       NULL::varchar AS portalloginpassword, NULL::timestamp AS creationdate,
-                       NULL::timestamp AS updatedate, NULL::varchar AS creationby, NULL::varchar AS updateby
-                WHERE FALSE
-            """)
+
+    def _sync_from_mysql(self):
+        Db = self.env['todd.radius.db']
+        try:
+            rows = Db._execute("SELECT * FROM userinfo")
+        except Exception as e:
+            _logger.error('TODD RADIUS: Error syncing userinfo from MySQL: %s', e)
+            return
+
+        self.env.cr.execute("DELETE FROM todd_radius_userinfo")
+        if rows:
+            cols = [
+                'radius_id', 'username', 'firstname', 'lastname', 'email',
+                'department', 'company', 'workphone', 'homephone', 'mobilephone',
+                'address', 'notes', 'city', 'state', 'country', 'zip',
+                'changeuserinfo', 'enableportallogin', 'tv',
+                'tvuser', 'tvpass', 'portalloginpassword',
+                'creationdate', 'updatedate', 'creationby', 'updateby',
+            ]
+            col_names = ', '.join(['id'] + cols)
+            placeholders = ', '.join(['%s'] * (len(cols) + 1))
+            values = []
+            for row in rows:
+                values.append(tuple(
+                    [row.get('id')] + [row.get(c) for c in cols]
+                ))
+            self.env.cr.executemany(
+                f"INSERT INTO todd_radius_userinfo ({col_names}) VALUES ({placeholders})",
+                values,
+            )
+
+    def search(self, args, offset=0, limit=None, order=None, count=False):
+        self._sync_from_mysql()
+        return super().search(args, offset=offset, limit=limit, order=order, count=count)
 
     def _compute_password(self):
         Db = self.env['todd.radius.db']
@@ -133,53 +163,6 @@ class ToddRadiusUserinfo(models.Model):
                 (rec.username,),
             )
             rec.is_online = bool(rows)
-
-    @api.model
-    def action_setup_fdw(self):
-        config = self.env['ir.config_parameter'].sudo()
-        host = config.get_param('todd.radius.db_host', '10.0.2.12')
-        port = config.get_param('todd.radius.db_port', '3306')
-        user = config.get_param('todd.radius.db_user', 'radius-gestion')
-        password = config.get_param('todd.radius.db_password', 'p4Bl1c')
-        database = config.get_param('todd.radius.db_name', 'radius')
-
-        try:
-            self.env.cr.execute("CREATE EXTENSION IF NOT EXISTS mysql_fdw")
-        except Exception as e:
-            raise UserError(f'No se pudo crear mysql_fdw. Ejecute como superuser:\nCREATE EXTENSION IF NOT EXISTS mysql_fdw;\n\nError: {e}')
-
-        try:
-            self.env.cr.execute("DROP SERVER IF EXISTS radius_mysql CASCADE")
-            self.env.cr.execute("""
-                CREATE SERVER radius_mysql
-                FOREIGN DATA WRAPPER mysql_fdw
-                OPTIONS (host %s, port %s)
-            """, (host, port))
-        except Exception as e:
-            raise UserError(f'Error creando server FDW: {e}')
-
-        try:
-            self.env.cr.execute("DROP USER MAPPING IF EXISTS CURRENT_USER SERVER radius_mysql")
-            self.env.cr.execute("""
-                CREATE USER MAPPING FOR CURRENT_USER
-                SERVER radius_mysql
-                OPTIONS (username %s, password %s)
-            """, (user, password))
-        except Exception as e:
-            raise UserError(f'Error creando user mapping: {e}')
-
-        try:
-            self.env.cr.execute(f"""
-                IMPORT FOREIGN SCHEMA {database}
-                LIMIT TO ({', '.join(FDW_TABLES)})
-                FROM SERVER radius_mysql
-                INTO public
-            """)
-        except Exception as e:
-            _logger.warning('TODD RADIUS: IMPORT FOREIGN SCHEMA falló (puede que ya existan): %s', e)
-
-        _logger.warning('TODD RADIUS: FDW setup completado')
-        raise UserError('FDW configurado correctamente. Las tablas MySQL están disponibles como tablas PostgreSQL.')
 
     def action_test_connection(self):
         ok = self.env['todd.radius.db']._test_connection()

@@ -1,9 +1,14 @@
+import logging
+
 from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 class ToddRadiusRadcheck(models.Model):
     _name = 'todd.radius.radcheck'
     _auto = False
+    _inherit = ['todd.radius.db']
     _description = 'Atributos check RADIUS'
 
     radius_id = fields.Integer(string='ID', readonly=True)
@@ -15,25 +20,39 @@ class ToddRadiusRadcheck(models.Model):
     def init(self):
         self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_radcheck CASCADE")
         self.env.cr.execute("""
-            SELECT EXISTS (
-                SELECT 1 FROM information_schema.foreign_tables
-                WHERE foreign_table_name = 'radcheck'
+            CREATE TABLE IF NOT EXISTS todd_radius_radcheck (
+                id SERIAL PRIMARY KEY,
+                radius_id INTEGER,
+                username VARCHAR(255),
+                attribute VARCHAR(255),
+                op VARCHAR(255),
+                value VARCHAR(255)
             )
         """)
-        fdw_ready = self.env.cr.fetchone()[0]
-        if fdw_ready:
-            self.env.cr.execute("""
-                CREATE OR REPLACE VIEW todd_radius_radcheck AS
-                SELECT id AS radius_id, id, username, attribute, op, value
-                FROM radcheck
-            """)
-        else:
-            self.env.cr.execute("""
-                CREATE OR REPLACE VIEW todd_radius_radcheck AS
-                SELECT 1 AS radius_id, 1 AS id, NULL::varchar AS username,
-                       NULL::varchar AS attribute, NULL::varchar AS op, NULL::varchar AS value
-                WHERE FALSE
-            """)
+
+    def _sync_from_mysql(self):
+        Db = self.env['todd.radius.db']
+        try:
+            rows = Db._execute("SELECT * FROM radcheck")
+        except Exception as e:
+            _logger.error('TODD RADIUS: Error syncing radcheck from MySQL: %s', e)
+            return
+
+        self.env.cr.execute("DELETE FROM todd_radius_radcheck")
+        if rows:
+            values = [
+                (r.get('id'), r.get('id'), r.get('username'), r.get('attribute'), r.get('op'), r.get('value'))
+                for r in rows
+            ]
+            self.env.cr.executemany(
+                "INSERT INTO todd_radius_radcheck (id, radius_id, username, attribute, op, value) "
+                "VALUES (%s, %s, %s, %s, %s, %s)",
+                values,
+            )
+
+    def search(self, args, offset=0, limit=None, order=None, count=False):
+        self._sync_from_mysql()
+        return super().search(args, offset=offset, limit=limit, order=order, count=count)
 
     def create(self, vals_list):
         Db = self.env['todd.radius.db']

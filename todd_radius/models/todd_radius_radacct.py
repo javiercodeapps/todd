@@ -1,9 +1,14 @@
+import logging
+
 from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 class ToddRadiusRadacct(models.Model):
     _name = 'todd.radius.radacct'
     _auto = False
+    _inherit = ['todd.radius.db']
     _description = 'Sesiones RADIUS'
 
     radacctid = fields.Integer(string='ID', readonly=True)
@@ -33,40 +38,66 @@ class ToddRadiusRadacct(models.Model):
     def init(self):
         self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_radacct CASCADE")
         self.env.cr.execute("""
-            SELECT EXISTS (
-                SELECT 1 FROM information_schema.foreign_tables
-                WHERE foreign_table_name = 'radacct'
+            CREATE TABLE IF NOT EXISTS todd_radius_radacct (
+                id SERIAL PRIMARY KEY,
+                radacctid INTEGER,
+                acctsessionid VARCHAR(255),
+                acctuniqueid VARCHAR(255),
+                username VARCHAR(255),
+                groupname VARCHAR(255),
+                realm VARCHAR(255),
+                nasipaddress VARCHAR(255),
+                nasportid VARCHAR(255),
+                nasporttype VARCHAR(255),
+                acctstarttime TIMESTAMP,
+                acctstoptime TIMESTAMP,
+                acctsessiontime INTEGER,
+                acctauthentic VARCHAR(255),
+                connectinfo_start VARCHAR(255),
+                connectinfo_stop VARCHAR(255),
+                acctinputoctets BIGINT,
+                acctoutputoctets BIGINT,
+                calledstationid VARCHAR(255),
+                callingstationid VARCHAR(255),
+                acctterminatecause VARCHAR(255),
+                servicetype VARCHAR(255),
+                framedprotocol VARCHAR(255),
+                framedipaddress VARCHAR(255)
             )
         """)
-        fdw_ready = self.env.cr.fetchone()[0]
-        if fdw_ready:
-            self.env.cr.execute("""
-                CREATE OR REPLACE VIEW todd_radius_radacct AS
-                SELECT radacctid AS id, radacctid, acctsessionid, acctuniqueid,
-                       username, groupname, realm, nasipaddress, nasportid, nasporttype,
-                       acctstarttime, acctstoptime, acctsessiontime, acctauthentic,
-                       connectinfo_start, connectinfo_stop, acctinputoctets, acctoutputoctets,
-                       calledstationid, callingstationid, acctterminatecause, servicetype,
-                       framedprotocol, framedipaddress
-                FROM radacct
-            """)
-        else:
-            self.env.cr.execute("""
-                CREATE OR REPLACE VIEW todd_radius_radacct AS
-                SELECT 1 AS id, 1 AS radacctid, NULL::varchar AS acctsessionid,
-                       NULL::varchar AS acctuniqueid, NULL::varchar AS username,
-                       NULL::varchar AS groupname, NULL::varchar AS realm,
-                       NULL::varchar AS nasipaddress, NULL::varchar AS nasportid,
-                       NULL::varchar AS nasporttype, NULL::timestamp AS acctstarttime,
-                       NULL::timestamp AS acctstoptime, 0 AS acctsessiontime,
-                       NULL::varchar AS acctauthentic, NULL::varchar AS connectinfo_start,
-                       NULL::varchar AS connectinfo_stop, 0 AS acctinputoctets,
-                       0 AS acctoutputoctets, NULL::varchar AS calledstationid,
-                       NULL::varchar AS callingstationid, NULL::varchar AS acctterminatecause,
-                       NULL::varchar AS servicetype, NULL::varchar AS framedprotocol,
-                       NULL::varchar AS framedipaddress
-                WHERE FALSE
-            """)
+
+    def _sync_from_mysql(self):
+        Db = self.env['todd.radius.db']
+        try:
+            rows = Db._execute("SELECT * FROM radacct")
+        except Exception as e:
+            _logger.error('TODD RADIUS: Error syncing radacct from MySQL: %s', e)
+            return
+
+        self.env.cr.execute("DELETE FROM todd_radius_radacct")
+        if rows:
+            cols = [
+                'radacctid', 'acctsessionid', 'acctuniqueid', 'username', 'groupname',
+                'realm', 'nasipaddress', 'nasportid', 'nasporttype',
+                'acctstarttime', 'acctstoptime', 'acctsessiontime', 'acctauthentic',
+                'connectinfo_start', 'connectinfo_stop', 'acctinputoctets', 'acctoutputoctets',
+                'calledstationid', 'callingstationid', 'acctterminatecause', 'servicetype',
+                'framedprotocol', 'framedipaddress',
+            ]
+            col_names = ', '.join(['id'] + cols)
+            placeholders = ', '.join(['%s'] * (len(cols) + 1))
+            values = [
+                tuple([r.get('id')] + [r.get(c) for c in cols])
+                for r in rows
+            ]
+            self.env.cr.executemany(
+                f"INSERT INTO todd_radius_radacct ({col_names}) VALUES ({placeholders})",
+                values,
+            )
+
+    def search(self, args, offset=0, limit=None, order=None, count=False):
+        self._sync_from_mysql()
+        return super().search(args, offset=offset, limit=limit, order=order, count=count)
 
     def name_get(self):
         result = []
