@@ -46,6 +46,7 @@ class ToddRadiusUserinfo(models.Model):
     is_online = fields.Boolean(string='Online', compute='_compute_online')
 
     def init(self):
+        _logger.warning('TODD RADIUS: init() userinfo - cargando modulo v19.0.2.4.0')
         self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_userinfo CASCADE")
         self.env.cr.execute("""
             CREATE TABLE IF NOT EXISTS todd_radius_userinfo (
