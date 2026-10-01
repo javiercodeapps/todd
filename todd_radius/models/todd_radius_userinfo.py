@@ -80,12 +80,17 @@ class ToddRadiusUserinfo(models.Model):
         """)
 
     def _sync_from_mysql(self):
+        _logger.warning('TODD RADIUS: _sync_from_mysql() userinfo - iniciando sync desde MySQL')
         Db = self.env['todd.radius.db']
         try:
             rows = Db._execute("SELECT * FROM userinfo")
         except Exception as e:
             _logger.error('TODD RADIUS: Error syncing userinfo from MySQL: %s', e)
-            return
+            raise UserError(
+                'No se pudieron cargar datos de MySQL.\n\n'
+                f'Error: {e}\n\n'
+                'Verifique todd.radius.db_* en Parámetros del Sistema.'
+            )
 
         self.env.cr.execute("DELETE FROM todd_radius_userinfo")
         if rows:
@@ -108,10 +113,16 @@ class ToddRadiusUserinfo(models.Model):
                 f"INSERT INTO todd_radius_userinfo ({col_names}) VALUES ({placeholders})",
                 values,
             )
+            _logger.warning('TODD RADIUS: userinfo sync OK - %s registros insertados en PostgreSQL', len(rows))
+        else:
+            _logger.warning('TODD RADIUS: userinfo sync OK - 0 registros en MySQL, staging vacio')
 
     def search(self, args, offset=0, limit=None, order=None, count=False):
+        _logger.warning('TODD RADIUS: search() userinfo - args=%s limit=%s', args, limit)
         self._sync_from_mysql()
-        return super().search(args, offset=offset, limit=limit, order=order, count=count)
+        result = super().search(args, offset=offset, limit=limit, order=order, count=count)
+        _logger.warning('TODD RADIUS: search() userinfo - resultado: %s registros', len(result) if not count else result)
+        return result
 
     def _compute_password(self):
         Db = self.env['todd.radius.db']
@@ -175,29 +186,36 @@ class ToddRadiusUserinfo(models.Model):
 
         try:
             cfg = Db._get_config()
-            _logger.warning('TODD RADIUS: Config: %s', cfg)
         except Exception as e:
-            _logger.error('TODD RADIUS: Error leyendo config: %s', e)
-            raise UserError(f'Error config: {e}')
+            raise UserError(f'Error leyendo config: {e}')
 
         try:
             rows = Db._execute("SELECT COUNT(*) AS total FROM userinfo")
             total = rows[0]['total'] if rows else 0
-            _logger.warning('TODD RADIUS: Total usuarios en MySQL: %s', total)
         except Exception as e:
-            _logger.error('TODD RADIUS: Error consultando MySQL: %s', e)
-            raise UserError(f'Error MySQL: {e}')
+            raise UserError(f'Error consultando MySQL: {e}\n\nConfig: {cfg.get("host")}:{cfg.get("port")}/{cfg.get("database")}')
 
         try:
-            sample = Db._execute("SELECT id, username, firstname, lastname FROM userinfo LIMIT 5")
-            _logger.warning('TODD RADIUS: Muestra: %s', sample)
+            self.env.cr.execute("SELECT COUNT(*) FROM todd_radius_userinfo")
+            pg_total = self.env.cr.fetchone()[0]
         except Exception as e:
-            _logger.error('TODD RADIUS: Error en muestra: %s', e)
+            pg_total = f'ERROR: {e}'
+
+        try:
+            sample = Db._execute("SELECT id, username, firstname, lastname FROM userinfo LIMIT 3")
+        except Exception as e:
             sample = []
 
-        msg = f"Config: {cfg.get('host')}:{cfg.get('port')}/{cfg.get('database')}\nTotal usuarios: {total}\n\nMuestra:\n"
+        msg = (
+            f"MySQL: {cfg.get('host')}:{cfg.get('port')}/{cfg.get('database')}\n"
+            f"Registros en MySQL: {total}\n"
+            f"Registros en PostgreSQL (staging): {pg_total}\n\n"
+            f"Muestra MySQL:\n"
+        )
         for r in sample:
             msg += f"  {r.get('id')}: {r.get('username')} - {r.get('firstname')} {r.get('lastname')}\n"
+        if not sample:
+            msg += "  (sin datos)\n"
         _logger.warning('TODD RADIUS: === FIN DIAGNOSTICO ===')
         raise UserError(msg)
 

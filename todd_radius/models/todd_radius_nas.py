@@ -1,6 +1,7 @@
 import logging
 
 from odoo import api, fields, models
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -39,12 +40,13 @@ class ToddRadiusNas(models.Model):
         """)
 
     def _sync_from_mysql(self):
+        _logger.warning('TODD RADIUS: _sync_from_mysql() nas - iniciando sync')
         Db = self.env['todd.radius.db']
         try:
             rows = Db._execute("SELECT * FROM nas")
         except Exception as e:
             _logger.error('TODD RADIUS: Error syncing nas from MySQL: %s', e)
-            return
+            raise UserError(f'No se pudieron cargar datos de nas desde MySQL: {e}')
 
         self.env.cr.execute("DELETE FROM todd_radius_nas")
         if rows:
@@ -59,10 +61,16 @@ class ToddRadiusNas(models.Model):
                 f"INSERT INTO todd_radius_nas ({col_names}) VALUES ({placeholders})",
                 values,
             )
+            _logger.warning('TODD RADIUS: nas sync OK - %s registros', len(rows))
+        else:
+            _logger.warning('TODD RADIUS: nas sync OK - 0 registros en MySQL')
 
     def search(self, args, offset=0, limit=None, order=None, count=False):
+        _logger.warning('TODD RADIUS: search() nas - args=%s', args)
         self._sync_from_mysql()
-        return super().search(args, offset=offset, limit=limit, order=order, count=count)
+        result = super().search(args, offset=offset, limit=limit, order=order, count=count)
+        _logger.warning('TODD RADIUS: search() nas - resultado: %s', len(result) if not count else result)
+        return result
 
     def create(self, vals_list):
         Db = self.env['todd.radius.db']

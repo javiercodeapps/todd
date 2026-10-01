@@ -1,6 +1,7 @@
 import logging
 
 from odoo import api, fields, models
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -39,12 +40,13 @@ class ToddRadiusRadippool(models.Model):
         """)
 
     def _sync_from_mysql(self):
+        _logger.warning('TODD RADIUS: _sync_from_mysql() radippool - iniciando sync')
         Db = self.env['todd.radius.db']
         try:
             rows = Db._execute("SELECT * FROM radippool")
         except Exception as e:
             _logger.error('TODD RADIUS: Error syncing radippool from MySQL: %s', e)
-            return
+            raise UserError(f'No se pudieron cargar datos de radippool desde MySQL: {e}')
 
         self.env.cr.execute("DELETE FROM todd_radius_radippool")
         if rows:
@@ -62,10 +64,16 @@ class ToddRadiusRadippool(models.Model):
                 f"INSERT INTO todd_radius_radippool ({col_names}) VALUES ({placeholders})",
                 values,
             )
+            _logger.warning('TODD RADIUS: radippool sync OK - %s registros', len(rows))
+        else:
+            _logger.warning('TODD RADIUS: radippool sync OK - 0 registros en MySQL')
 
     def search(self, args, offset=0, limit=None, order=None, count=False):
+        _logger.warning('TODD RADIUS: search() radippool - args=%s', args)
         self._sync_from_mysql()
-        return super().search(args, offset=offset, limit=limit, order=order, count=count)
+        result = super().search(args, offset=offset, limit=limit, order=order, count=count)
+        _logger.warning('TODD RADIUS: search() radippool - resultado: %s', len(result) if not count else result)
+        return result
 
     def name_get(self):
         return [(rec.id, f"{rec.pool_name}: {rec.framedipaddress}") for rec in self]

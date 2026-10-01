@@ -1,6 +1,7 @@
 import logging
 
 from odoo import api, fields, models
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -67,12 +68,13 @@ class ToddRadiusRadacct(models.Model):
         """)
 
     def _sync_from_mysql(self):
+        _logger.warning('TODD RADIUS: _sync_from_mysql() radacct - iniciando sync')
         Db = self.env['todd.radius.db']
         try:
             rows = Db._execute("SELECT * FROM radacct")
         except Exception as e:
             _logger.error('TODD RADIUS: Error syncing radacct from MySQL: %s', e)
-            return
+            raise UserError(f'No se pudieron cargar datos de radacct desde MySQL: {e}')
 
         self.env.cr.execute("DELETE FROM todd_radius_radacct")
         if rows:
@@ -94,10 +96,16 @@ class ToddRadiusRadacct(models.Model):
                 f"INSERT INTO todd_radius_radacct ({col_names}) VALUES ({placeholders})",
                 values,
             )
+            _logger.warning('TODD RADIUS: radacct sync OK - %s registros', len(rows))
+        else:
+            _logger.warning('TODD RADIUS: radacct sync OK - 0 registros en MySQL')
 
     def search(self, args, offset=0, limit=None, order=None, count=False):
+        _logger.warning('TODD RADIUS: search() radacct - args=%s', args)
         self._sync_from_mysql()
-        return super().search(args, offset=offset, limit=limit, order=order, count=count)
+        result = super().search(args, offset=offset, limit=limit, order=order, count=count)
+        _logger.warning('TODD RADIUS: search() radacct - resultado: %s', len(result) if not count else result)
+        return result
 
     def name_get(self):
         result = []
