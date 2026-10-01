@@ -23,7 +23,7 @@ class ToddRadiusRadippool(models.Model):
     pool_key = fields.Char(string='Clave Pool')
 
     def init(self):
-        self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_radippool CASCADE")
+        self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_radippool CASCADE")
         self.env.cr.execute("""
             CREATE TABLE IF NOT EXISTS todd_radius_radippool (
                 id SERIAL PRIMARY KEY,

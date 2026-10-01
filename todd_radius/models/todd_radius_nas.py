@@ -23,7 +23,7 @@ class ToddRadiusNas(models.Model):
     description = fields.Char(string='Descripción')
 
     def init(self):
-        self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_nas CASCADE")
+        self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_nas CASCADE")
         self.env.cr.execute("""
             CREATE TABLE IF NOT EXISTS todd_radius_nas (
                 id SERIAL PRIMARY KEY,

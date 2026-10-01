@@ -19,7 +19,7 @@ class ToddRadiusRadcheck(models.Model):
     value = fields.Char(string='Valor')
 
     def init(self):
-        self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_radcheck CASCADE")
+        self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_radcheck CASCADE")
         self.env.cr.execute("""
             CREATE TABLE IF NOT EXISTS todd_radius_radcheck (
                 id SERIAL PRIMARY KEY,

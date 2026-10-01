@@ -17,7 +17,7 @@ class ToddRadiusRadusergroup(models.Model):
     priority = fields.Integer(string='Prioridad', default=0)
 
     def init(self):
-        self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_radusergroup CASCADE")
+        self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_radusergroup CASCADE")
         self.env.cr.execute("""
             CREATE TABLE IF NOT EXISTS todd_radius_radusergroup (
                 id SERIAL PRIMARY KEY,
