@@ -135,6 +135,30 @@ class ToddRadiusUserinfo(models.Model):
         ok = self.env['todd.radius.db']._test_connection()
         raise UserError('Conexión MySQL OK' if ok else 'Fallo conexión. Revise todd.radius.db_* en Parámetros del Sistema')
 
+    def action_reconfigurar_fdw(self):
+        config = self.env['ir.config_parameter'].sudo()
+        host = config.get_param('todd.radius.db_host', '10.0.2.12')
+        port = config.get_param('todd.radius.db_port', '3306')
+        user = config.get_param('todd.radius.db_user', 'radius-gestion')
+        password = config.get_param('todd.radius.db_password', 'p4Bl1c')
+
+        try:
+            self.env.cr.execute("DROP SERVER IF EXISTS radius_mysql CASCADE")
+        except Exception:
+            pass
+        self.env.cr.execute("""
+            CREATE SERVER radius_mysql
+            FOREIGN DATA WRAPPER mysql_fdw
+            OPTIONS (host %s, port %s, keep_connections 'on', max_connections '20')
+        """, (host, port))
+        self.env.cr.execute("""
+            CREATE USER MAPPING FOR CURRENT_USER
+            SERVER radius_mysql
+            OPTIONS (username %s, password %s)
+        """, (user, password))
+        self.env.cr.commit()
+        raise UserError('FDW reconfigurado con keep_connections=on. Ahora actualice el módulo: Todd Radius → Actualizar')
+
     @api.model
     def action_diagnostico(self):
         Db = self.env['todd.radius.db']
