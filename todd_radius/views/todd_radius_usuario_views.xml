@@ -84,4 +84,38 @@
         <field name="view_mode">list,form</field>
     </record>
 
+    <!-- radusergroup views -->
+    <record id="todd_radius_radusergroup_list" model="ir.ui.view">
+        <field name="name">todd.radius.radusergroup.list</field>
+        <field name="model">todd.radius.radusergroup</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="username"/>
+                <field name="groupname"/>
+                <field name="priority"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="todd_radius_radusergroup_search" model="ir.ui.view">
+        <field name="name">todd.radius.radusergroup.search</field>
+        <field name="model">todd.radius.radusergroup</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="username"/>
+                <field name="groupname"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="groupby_group" string="Grupo" context="{'group_by': 'groupname'}"/>
+                    <filter name="groupby_user" string="Usuario" context="{'group_by': 'username'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_todd_radius_usergroups" model="ir.actions.act_window">
+        <field name="name">Grupos de Usuarios</field>
+        <field name="res_model">todd.radius.radusergroup</field>
+        <field name="view_mode">list</field>
+    </record>
+
 </odoo>

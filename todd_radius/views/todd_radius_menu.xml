@@ -20,6 +20,13 @@
               sequence="10"
               groups="group_todd_radius_user"/>
 
+    <menuitem id="menu_todd_radius_usuarios_grupos"
+              name="Grupos"
+              parent="menu_todd_radius_usuarios"
+              action="action_todd_radius_usergroups"
+              sequence="20"
+              groups="group_todd_radius_user"/>
+
     <!-- Reportes -->
     <menuitem id="menu_todd_radius_reportes"
               name="Reportes"
