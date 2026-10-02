@@ -155,7 +155,7 @@ class ToddRadiusUserinfo(models.Model):
         self.env.cr.execute("""
             CREATE SERVER radius_mysql
             FOREIGN DATA WRAPPER mysql_fdw
-            OPTIONS (host %s, port %s, keep_connections 'on', max_connections '20')
+            OPTIONS (host %s, port %s, reconnect 'true')
         """, (host, port))
         self.env.cr.execute("""
             CREATE USER MAPPING FOR CURRENT_USER
@@ -163,7 +163,7 @@ class ToddRadiusUserinfo(models.Model):
             OPTIONS (username %s, password %s)
         """, (user, password))
         self.env.cr.commit()
-        raise UserError('FDW reconfigurado con keep_connections=on. Ahora actualice el módulo: Todd Radius → Actualizar')
+        raise UserError('FDW reconfigurado con reconnect=true. Ahora actualice el módulo: Todd Radius → Actualizar')
 
     @api.model
     def action_diagnostico(self):
