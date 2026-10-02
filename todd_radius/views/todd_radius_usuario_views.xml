@@ -106,10 +106,8 @@
             <search>
                 <field name="username"/>
                 <field name="groupname"/>
-                <group expand="0" string="Agrupar por">
-                    <filter name="groupby_group" string="Grupo" context="{'group_by': 'groupname'}"/>
-                    <filter name="groupby_user" string="Usuario" context="{'group_by': 'username'}"/>
-                </group>
+                <filter name="groupby_group" string="Grupo" context="{'group_by': 'groupname'}"/>
+                <filter name="groupby_user" string="Usuario" context="{'group_by': 'username'}"/>
             </search>
         </field>
     </record>
