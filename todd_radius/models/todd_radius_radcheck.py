@@ -18,8 +18,14 @@ class ToddRadiusRadcheck(models.Model):
     value = fields.Char(string='Valor')
 
     def init(self):
-        self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_radcheck CASCADE")
-        self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_radcheck CASCADE")
+        try:
+            self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_radcheck CASCADE")
+        except Exception:
+            self.env.cr.rollback()
+        try:
+            self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_radcheck CASCADE")
+        except Exception:
+            self.env.cr.rollback()
         self.env.cr.execute("""
             SELECT EXISTS (
                 SELECT 1 FROM information_schema.foreign_tables

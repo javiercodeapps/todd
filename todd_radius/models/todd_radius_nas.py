@@ -22,8 +22,14 @@ class ToddRadiusNas(models.Model):
     description = fields.Char(string='Descripción')
 
     def init(self):
-        self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_nas CASCADE")
-        self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_nas CASCADE")
+        try:
+            self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_nas CASCADE")
+        except Exception:
+            self.env.cr.rollback()
+        try:
+            self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_nas CASCADE")
+        except Exception:
+            self.env.cr.rollback()
         self.env.cr.execute("""
             SELECT EXISTS (
                 SELECT 1 FROM information_schema.foreign_tables

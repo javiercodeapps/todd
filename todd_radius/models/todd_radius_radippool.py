@@ -22,8 +22,14 @@ class ToddRadiusRadippool(models.Model):
     pool_key = fields.Char(string='Clave Pool')
 
     def init(self):
-        self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_radippool CASCADE")
-        self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_radippool CASCADE")
+        try:
+            self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_radippool CASCADE")
+        except Exception:
+            self.env.cr.rollback()
+        try:
+            self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_radippool CASCADE")
+        except Exception:
+            self.env.cr.rollback()
         self.env.cr.execute("""
             SELECT EXISTS (
                 SELECT 1 FROM information_schema.foreign_tables

@@ -46,8 +46,14 @@ class ToddRadiusUserinfo(models.Model):
     is_online = fields.Boolean(string='Online', compute='_compute_online')
 
     def init(self):
-        self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_userinfo CASCADE")
-        self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_userinfo CASCADE")
+        try:
+            self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_userinfo CASCADE")
+        except Exception:
+            self.env.cr.rollback()
+        try:
+            self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_userinfo CASCADE")
+        except Exception:
+            self.env.cr.rollback()
         self.env.cr.execute("""
             SELECT EXISTS (
                 SELECT 1 FROM information_schema.foreign_tables
