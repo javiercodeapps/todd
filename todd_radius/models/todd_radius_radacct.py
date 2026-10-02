@@ -45,7 +45,6 @@ class ToddRadiusRadacct(models.Model):
             )
         """)
         fdw_ready = self.env.cr.fetchone()[0]
-        _logger.warning('TODD RADIUS: init() radacct - FDW disponible: %s', fdw_ready)
         if fdw_ready:
             self.env.cr.execute("""
                 CREATE OR REPLACE VIEW todd_radius_radacct AS

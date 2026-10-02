@@ -22,16 +22,11 @@ def _get_mysql_driver():
         try:
             mod = __import__(mod_name, fromlist=['connect'])
             _mysql_driver = (name, mod)
-            _logger.warning('TODD RADIUS: MySQL driver encontrado: %s', name)
             return _mysql_driver
         except ImportError:
             continue
 
     _mysql_driver = ('none', None)
-    _logger.error(
-        'TODD RADIUS: No hay driver MySQL instalado. '
-        'Instale pymysql: pip3 install pymysql'
-    )
     return _mysql_driver
 
 
@@ -49,10 +44,6 @@ class ToddRadiusDb(models.AbstractModel):
             'password': config.get_param('todd.radius.db_password', 'p4Bl1c'),
             'database': config.get_param('todd.radius.db_name', 'radius'),
         }
-        _logger.warning(
-            'TODD RADIUS CONFIG: host=%s port=%s user=%s database=%s',
-            cfg['host'], cfg['port'], cfg['user'], cfg['database'],
-        )
         return cfg
 
     @contextmanager
@@ -66,10 +57,6 @@ class ToddRadiusDb(models.AbstractModel):
             )
 
         cfg = self._get_config()
-        _logger.warning(
-            'TODD RADIUS: Conectando con %s a %s@%s:%s/%s',
-            driver_name, cfg['user'], cfg['host'], cfg['port'], cfg['database'],
-        )
 
         try:
             if driver_name == 'pymysql':
@@ -94,7 +81,6 @@ class ToddRadiusDb(models.AbstractModel):
                     db=cfg['database'], charset='utf8mb4',
                 )
 
-            _logger.warning('TODD RADIUS: Conexión MySQL OK con %s', driver_name)
             try:
                 yield conn
                 conn.commit()
@@ -116,39 +102,30 @@ class ToddRadiusDb(models.AbstractModel):
 
     @api.model
     def _execute(self, query, params=None):
-        _logger.warning('TODD RADIUS SQL: %s params=%s', query[:200], params)
         with self._get_cursor() as conn:
             cur = conn.cursor()
             cur.execute(query, params)
             rows = cur.fetchall()
             cur.close()
-            _logger.warning('TODD RADIUS SQL: %s filas returned', len(rows))
             return rows
 
     @api.model
     def _execute_write(self, query, params=None):
-        _logger.warning('TODD RADIUS SQL WRITE: %s params=%s', query[:200], params)
         with self._get_cursor() as conn:
             cur = conn.cursor()
             cur.execute(query, params)
             rowcount = cur.rowcount
             cur.close()
-            _logger.warning('TODD RADIUS SQL WRITE: %s filas afectadas', rowcount)
             return rowcount
 
     @api.model
     def _test_connection(self):
-        _logger.warning('TODD RADIUS: Probando conexión...')
-        driver_name, _ = _get_mysql_driver()
-        _logger.warning('TODD RADIUS: Driver disponible: %s', driver_name)
         try:
             with self._get_cursor() as conn:
                 cur = conn.cursor()
                 cur.execute('SELECT 1')
                 cur.fetchone()
                 cur.close()
-            _logger.warning('TODD RADIUS: Test de conexión OK')
             return True
-        except Exception as e:
-            _logger.error('TODD RADIUS: Test de conexión FALLÓ: %s', e)
+        except Exception:
             return False

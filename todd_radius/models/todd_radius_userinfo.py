@@ -55,7 +55,6 @@ class ToddRadiusUserinfo(models.Model):
             )
         """)
         fdw_ready = self.env.cr.fetchone()[0]
-        _logger.warning('TODD RADIUS: init() userinfo - FDW disponible: %s', fdw_ready)
         if fdw_ready:
             self.env.cr.execute("""
                 CREATE OR REPLACE VIEW todd_radius_userinfo AS
@@ -66,7 +65,6 @@ class ToddRadiusUserinfo(models.Model):
                        creationdate, updatedate, creationby, updateby
                 FROM userinfo
             """)
-            _logger.warning('TODD RADIUS: init() userinfo - vista FDW creada')
         else:
             self.env.cr.execute("""
                 CREATE OR REPLACE VIEW todd_radius_userinfo AS
@@ -81,7 +79,6 @@ class ToddRadiusUserinfo(models.Model):
                        NULL::timestamp AS updatedate, NULL::varchar AS creationby, NULL::varchar AS updateby
                 WHERE FALSE
             """)
-            _logger.warning('TODD RADIUS: init() userinfo - FDW no disponible, vista vacia creada')
 
     def _compute_password(self):
         Db = self.env['todd.radius.db']
