@@ -46,84 +46,42 @@ class ToddRadiusUserinfo(models.Model):
     is_online = fields.Boolean(string='Online', compute='_compute_online')
 
     def init(self):
-        _logger.warning('TODD RADIUS: init() userinfo - cargando modulo v19.0.2.4.0')
         self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_userinfo CASCADE")
+        self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_userinfo CASCADE")
         self.env.cr.execute("""
-            CREATE TABLE IF NOT EXISTS todd_radius_userinfo (
-                id SERIAL PRIMARY KEY,
-                radius_id INTEGER,
-                username VARCHAR(255),
-                firstname VARCHAR(255),
-                lastname VARCHAR(255),
-                email VARCHAR(255),
-                department VARCHAR(255),
-                company VARCHAR(255),
-                workphone VARCHAR(255),
-                homephone VARCHAR(255),
-                mobilephone VARCHAR(255),
-                address TEXT,
-                notes TEXT,
-                city VARCHAR(255),
-                state VARCHAR(255),
-                country VARCHAR(255),
-                zip VARCHAR(255),
-                changeuserinfo BOOLEAN,
-                enableportallogin BOOLEAN,
-                tv BOOLEAN,
-                tvuser VARCHAR(255),
-                tvpass VARCHAR(255),
-                portalloginpassword VARCHAR(255),
-                creationdate TIMESTAMP,
-                updatedate TIMESTAMP,
-                creationby VARCHAR(255),
-                updateby VARCHAR(255)
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.foreign_tables
+                WHERE foreign_table_name = 'userinfo'
             )
         """)
-
-    def _sync_from_mysql(self):
-        _logger.warning('TODD RADIUS: _sync_from_mysql() userinfo - iniciando sync desde MySQL')
-        Db = self.env['todd.radius.db']
-        try:
-            rows = Db._execute("SELECT * FROM userinfo")
-        except Exception as e:
-            _logger.error('TODD RADIUS: Error syncing userinfo from MySQL: %s', e)
-            raise UserError(
-                'No se pudieron cargar datos de MySQL.\n\n'
-                f'Error: {e}\n\n'
-                'Verifique todd.radius.db_* en Parámetros del Sistema.'
-            )
-
-        self.env.cr.execute("DELETE FROM todd_radius_userinfo")
-        if rows:
-            cols = [
-                'radius_id', 'username', 'firstname', 'lastname', 'email',
-                'department', 'company', 'workphone', 'homephone', 'mobilephone',
-                'address', 'notes', 'city', 'state', 'country', 'zip',
-                'changeuserinfo', 'enableportallogin', 'tv',
-                'tvuser', 'tvpass', 'portalloginpassword',
-                'creationdate', 'updatedate', 'creationby', 'updateby',
-            ]
-            col_names = ', '.join(['id'] + cols)
-            placeholders = ', '.join(['%s'] * (len(cols) + 1))
-            values = []
-            for row in rows:
-                values.append(tuple(
-                    [row.get('id')] + [row.get(c) for c in cols]
-                ))
-            self.env.cr.executemany(
-                f"INSERT INTO todd_radius_userinfo ({col_names}) VALUES ({placeholders})",
-                values,
-            )
-            _logger.warning('TODD RADIUS: userinfo sync OK - %s registros insertados en PostgreSQL', len(rows))
+        fdw_ready = self.env.cr.fetchone()[0]
+        _logger.warning('TODD RADIUS: init() userinfo - FDW disponible: %s', fdw_ready)
+        if fdw_ready:
+            self.env.cr.execute("""
+                CREATE OR REPLACE VIEW todd_radius_userinfo AS
+                SELECT id, id AS radius_id, username, firstname, lastname, email, department, company,
+                       workphone, homephone, mobilephone, address, notes, city, state, country, zip,
+                       changeuserinfo::boolean, enableportallogin::boolean, tv::boolean,
+                       tvuser, tvpass, portalloginpassword,
+                       creationdate, updatedate, creationby, updateby
+                FROM userinfo
+            """)
+            _logger.warning('TODD RADIUS: init() userinfo - vista FDW creada')
         else:
-            _logger.warning('TODD RADIUS: userinfo sync OK - 0 registros en MySQL, staging vacio')
-
-    def search(self, args, offset=0, limit=None, order=None, count=False):
-        _logger.warning('TODD RADIUS: search() userinfo - args=%s limit=%s', args, limit)
-        self._sync_from_mysql()
-        result = super().search(args, offset=offset, limit=limit, order=order, count=count)
-        _logger.warning('TODD RADIUS: search() userinfo - resultado: %s registros', len(result) if not count else result)
-        return result
+            self.env.cr.execute("""
+                CREATE OR REPLACE VIEW todd_radius_userinfo AS
+                SELECT 1 AS radius_id, NULL::varchar AS username, NULL::varchar AS firstname,
+                       NULL::varchar AS lastname, NULL::varchar AS email, NULL::varchar AS department,
+                       NULL::varchar AS company, NULL::varchar AS workphone, NULL::varchar AS homephone,
+                       NULL::varchar AS mobilephone, NULL::text AS address, NULL::text AS notes,
+                       NULL::varchar AS city, NULL::varchar AS state, NULL::varchar AS country,
+                       NULL::varchar AS zip, FALSE AS changeuserinfo, FALSE AS enableportallogin,
+                       FALSE AS tv, NULL::varchar AS tvuser, NULL::varchar AS tvpass,
+                       NULL::varchar AS portalloginpassword, NULL::timestamp AS creationdate,
+                       NULL::timestamp AS updatedate, NULL::varchar AS creationby, NULL::varchar AS updateby
+                WHERE FALSE
+            """)
+            _logger.warning('TODD RADIUS: init() userinfo - FDW no disponible, vista vacia creada')
 
     def _compute_password(self):
         Db = self.env['todd.radius.db']
@@ -182,42 +140,36 @@ class ToddRadiusUserinfo(models.Model):
 
     @api.model
     def action_diagnostico(self):
-        _logger.warning('TODD RADIUS: === INICIO DIAGNOSTICO ===')
         Db = self.env['todd.radius.db']
-
         try:
             cfg = Db._get_config()
         except Exception as e:
             raise UserError(f'Error leyendo config: {e}')
-
         try:
             rows = Db._execute("SELECT COUNT(*) AS total FROM userinfo")
             total = rows[0]['total'] if rows else 0
         except Exception as e:
-            raise UserError(f'Error consultando MySQL: {e}\n\nConfig: {cfg.get("host")}:{cfg.get("port")}/{cfg.get("database")}')
-
+            raise UserError(f'Error MySQL: {e}')
+        self.env.cr.execute("SELECT EXISTS (SELECT 1 FROM information_schema.foreign_tables WHERE foreign_table_name = 'userinfo')")
+        fdw_ok = self.env.cr.fetchone()[0]
         try:
             self.env.cr.execute("SELECT COUNT(*) FROM todd_radius_userinfo")
-            pg_total = self.env.cr.fetchone()[0]
+            pg_count = self.env.cr.fetchone()[0]
         except Exception as e:
-            pg_total = f'ERROR: {e}'
-
+            pg_count = f'ERROR: {e}'
         try:
             sample = Db._execute("SELECT id, username, firstname, lastname FROM userinfo LIMIT 3")
         except Exception as e:
             sample = []
-
         msg = (
             f"MySQL: {cfg.get('host')}:{cfg.get('port')}/{cfg.get('database')}\n"
-            f"Registros en MySQL: {total}\n"
-            f"Registros en PostgreSQL (staging): {pg_total}\n\n"
-            f"Muestra MySQL:\n"
+            f"FDW disponible: {'SI' if fdw_ok else 'NO'}\n"
+            f"Registros MySQL: {total}\n"
+            f"Registros vista PostgreSQL: {pg_count}\n\n"
+            f"Muestra:\n"
         )
         for r in sample:
             msg += f"  {r.get('id')}: {r.get('username')} - {r.get('firstname')} {r.get('lastname')}\n"
-        if not sample:
-            msg += "  (sin datos)\n"
-        _logger.warning('TODD RADIUS: === FIN DIAGNOSTICO ===')
         raise UserError(msg)
 
     def create(self, vals_list):

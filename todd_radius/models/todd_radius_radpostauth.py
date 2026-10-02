@@ -1,7 +1,6 @@
 import logging
 
 from odoo import api, fields, models
-from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -20,47 +19,29 @@ class ToddRadiusRadpostauth(models.Model):
 
     def init(self):
         self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_radpostauth CASCADE")
+        self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_radpostauth CASCADE")
         self.env.cr.execute("""
-            CREATE TABLE IF NOT EXISTS todd_radius_radpostauth (
-                id SERIAL PRIMARY KEY,
-                radius_id INTEGER,
-                username VARCHAR(255),
-                password VARCHAR(255),
-                reply VARCHAR(255),
-                authdate TIMESTAMP
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.foreign_tables
+                WHERE foreign_table_name = 'radpostauth'
             )
         """)
-
-    def _sync_from_mysql(self):
-        _logger.warning('TODD RADIUS: _sync_from_mysql() radpostauth - iniciando sync')
-        Db = self.env['todd.radius.db']
-        try:
-            rows = Db._execute("SELECT * FROM radpostauth")
-        except Exception as e:
-            _logger.error('TODD RADIUS: Error syncing radpostauth from MySQL: %s', e)
-            raise UserError(f'No se pudieron cargar datos de radpostauth desde MySQL: {e}')
-
-        self.env.cr.execute("DELETE FROM todd_radius_radpostauth")
-        if rows:
-            values = [
-                (r.get('id'), r.get('id'), r.get('username'), r.get('password'), r.get('reply'), r.get('authdate'))
-                for r in rows
-            ]
-            self.env.cr.executemany(
-                "INSERT INTO todd_radius_radpostauth (id, radius_id, username, password, reply, authdate) "
-                "VALUES (%s, %s, %s, %s, %s, %s)",
-                values,
-            )
-            _logger.warning('TODD RADIUS: radpostauth sync OK - %s registros', len(rows))
+        fdw_ready = self.env.cr.fetchone()[0]
+        _logger.warning('TODD RADIUS: init() radpostauth - FDW disponible: %s', fdw_ready)
+        if fdw_ready:
+            self.env.cr.execute("""
+                CREATE OR REPLACE VIEW todd_radius_radpostauth AS
+                SELECT id AS radius_id, id, username, password, reply, authdate
+                FROM radpostauth
+            """)
         else:
-            _logger.warning('TODD RADIUS: radpostauth sync OK - 0 registros en MySQL')
-
-    def search(self, args, offset=0, limit=None, order=None, count=False):
-        _logger.warning('TODD RADIUS: search() radpostauth - args=%s', args)
-        self._sync_from_mysql()
-        result = super().search(args, offset=offset, limit=limit, order=order, count=count)
-        _logger.warning('TODD RADIUS: search() radpostauth - resultado: %s', len(result) if not count else result)
-        return result
+            self.env.cr.execute("""
+                CREATE OR REPLACE VIEW todd_radius_radpostauth AS
+                SELECT 1 AS radius_id, 1 AS id, NULL::varchar AS username,
+                       NULL::varchar AS password, NULL::varchar AS reply,
+                       NULL::timestamp AS authdate
+                WHERE FALSE
+            """)
 
     def name_get(self):
         result = []

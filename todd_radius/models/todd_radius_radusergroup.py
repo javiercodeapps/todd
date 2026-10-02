@@ -1,7 +1,6 @@
 import logging
 
 from odoo import api, fields, models
-from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -18,45 +17,27 @@ class ToddRadiusRadusergroup(models.Model):
 
     def init(self):
         self.env.cr.execute("DROP TABLE IF EXISTS todd_radius_radusergroup CASCADE")
+        self.env.cr.execute("DROP VIEW IF EXISTS todd_radius_radusergroup CASCADE")
         self.env.cr.execute("""
-            CREATE TABLE IF NOT EXISTS todd_radius_radusergroup (
-                id SERIAL PRIMARY KEY,
-                username VARCHAR(255),
-                groupname VARCHAR(255),
-                priority INTEGER DEFAULT 0
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.foreign_tables
+                WHERE foreign_table_name = 'radusergroup'
             )
         """)
-
-    def _sync_from_mysql(self):
-        _logger.warning('TODD RADIUS: _sync_from_mysql() radusergroup - iniciando sync')
-        Db = self.env['todd.radius.db']
-        try:
-            rows = Db._execute("SELECT * FROM radusergroup")
-        except Exception as e:
-            _logger.error('TODD RADIUS: Error syncing radusergroup from MySQL: %s', e)
-            raise UserError(f'No se pudieron cargar datos de radusergroup desde MySQL: {e}')
-
-        self.env.cr.execute("DELETE FROM todd_radius_radusergroup")
-        if rows:
-            values = [
-                (r.get('username'), r.get('groupname'), r.get('priority', 0))
-                for r in rows
-            ]
-            self.env.cr.executemany(
-                "INSERT INTO todd_radius_radusergroup (username, groupname, priority) "
-                "VALUES (%s, %s, %s)",
-                values,
-            )
-            _logger.warning('TODD RADIUS: radusergroup sync OK - %s registros', len(rows))
+        fdw_ready = self.env.cr.fetchone()[0]
+        _logger.warning('TODD RADIUS: init() radusergroup - FDW disponible: %s', fdw_ready)
+        if fdw_ready:
+            self.env.cr.execute("""
+                CREATE OR REPLACE VIEW todd_radius_radusergroup AS
+                SELECT ROW_NUMBER() OVER () AS id, username, groupname, priority
+                FROM radusergroup
+            """)
         else:
-            _logger.warning('TODD RADIUS: radusergroup sync OK - 0 registros en MySQL')
-
-    def search(self, args, offset=0, limit=None, order=None, count=False):
-        _logger.warning('TODD RADIUS: search() radusergroup - args=%s', args)
-        self._sync_from_mysql()
-        result = super().search(args, offset=offset, limit=limit, order=order, count=count)
-        _logger.warning('TODD RADIUS: search() radusergroup - resultado: %s', len(result) if not count else result)
-        return result
+            self.env.cr.execute("""
+                CREATE OR REPLACE VIEW todd_radius_radusergroup AS
+                SELECT 1 AS id, NULL::varchar AS username, NULL::varchar AS groupname, 0 AS priority
+                WHERE FALSE
+            """)
 
     def create(self, vals_list):
         Db = self.env['todd.radius.db']
