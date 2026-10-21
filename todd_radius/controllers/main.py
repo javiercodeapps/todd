@@ -5,16 +5,9 @@ import logging
 from odoo import http
 from odoo.http import request
 
-_logger = logging.getLogger(__name__)
+from ..radius_utils import PASSWORD_ATTRS, USERINFO_EXCLUDE
 
-PASSWORD_ATTRS = (
-    'Cleartext-Password',
-    'NT-Password',
-    'MD5-Password',
-    'Crypt-Password',
-    'SHA2-Password',
-)
-USERINFO_EXCLUDE = ('portalloginpassword', 'tvpass')
+_logger = logging.getLogger(__name__)
 
 
 def _api_key_ok():

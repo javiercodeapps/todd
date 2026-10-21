@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from odoo.tests import TransactionCase, tagged
 
@@ -50,20 +50,32 @@ class TestToddApiCliente(TransactionCase):
         partner = self.env['res.partner'].todd_buscar_por_numero('99999999')
         self.assertFalse(partner)
 
-    @patch('odoo.addons.todd_facturas.models.res_partner.requests.get')
-    def test_estado_cliente_incluye_facturas_y_radius(self, mock_get):
-        self.env['ir.config_parameter'].sudo().set_param('todd.radius_api_key', 'radius-key')
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = {'plan': '10mb', 'estado': 'activo'}
-        mock_get.return_value = mock_resp
+    @patch('odoo.addons.todd_radius.models.todd_radius_userinfo.'
+           'ToddRadiusUserinfo.radius_info_usuarios')
+    def test_estado_cliente_incluye_facturas_y_radius(self, mock_info):
+        mock_info.return_value = {
+            'puchiknicolas': {
+                'user_id': 42,
+                'raduserinfo': {'id': 42, 'username': 'puchiknicolas', 'estado': 'activo'},
+                'raduseracct': [],
+                'radcheck': [],
+                'radgroups': [],
+            },
+        }
         data = self.env['res.partner'].todd_api_estado_cliente('30111222')
         self.assertEqual(data['partner']['vat'], '30111222')
         self.assertEqual(len(data['servicios']), 1)
         self.assertEqual(data['servicios'][0]['nro_socio'], '107482')
-        self.assertEqual(data['servicios'][0]['radius']['estado'], 'activo')
+        self.assertEqual(data['servicios'][0]['radius']['raduserinfo']['estado'], 'activo')
         self.assertFalse(data['servicios'][0]['radius_error'])
         self.assertEqual(len(data['facturas']), 1)
         self.assertEqual(data['facturas'][0]['numero'], '0001-00000123')
         self.assertEqual(data['facturas'][0]['servicio_nombre'], 'Internet')
-        mock_get.assert_called_once()
+        mock_info.assert_called_once()
+
+    @patch('odoo.addons.todd_radius.models.todd_radius_userinfo.'
+           'ToddRadiusUserinfo.radius_info_usuarios')
+    def test_estado_cliente_radius_sin_usuario(self, mock_info):
+        mock_info.return_value = {}
+        data = self.env['res.partner'].todd_api_estado_cliente('30111222')
+        self.assertEqual(data['servicios'][0]['radius_error'], 'Cliente no encontrado')

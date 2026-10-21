@@ -110,6 +110,22 @@ class ToddRadiusDb(models.AbstractModel):
             return rows
 
     @api.model
+    def _execute_many(self, queries):
+        """Ejecuta varias consultas de lectura en una sola conexión.
+
+        :param queries: lista de tuplas ``(query, params)``
+        :return: lista de resultados, en el mismo orden que ``queries``
+        """
+        resultados = []
+        with self._get_cursor() as conn:
+            cur = conn.cursor()
+            for query, params in queries:
+                cur.execute(query, params)
+                resultados.append(cur.fetchall())
+            cur.close()
+        return resultados
+
+    @api.model
     def _execute_write(self, query, params=None):
         with self._get_cursor() as conn:
             cur = conn.cursor()

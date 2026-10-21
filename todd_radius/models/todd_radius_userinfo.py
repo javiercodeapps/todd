@@ -3,6 +3,8 @@ import logging
 from odoo import api, fields, models
 from odoo.exceptions import UserError
 
+from ..radius_utils import PASSWORD_ATTRS, USERINFO_EXCLUDE, json_safe_row
+
 _logger = logging.getLogger(__name__)
 
 
@@ -142,6 +144,79 @@ class ToddRadiusUserinfo(models.Model):
                 (rec.username,),
             )
             rec.is_online = bool(rows)
+
+    @api.model
+    def radius_info_usuarios(self, usernames):
+        """Info RADIUS de varios usuarios, indexada por ``username``.
+
+        Equivale al endpoint ``/radius/user_info/data`` del sistema anterior,
+        pero leyendo directamente la base MySQL de RADIUS. Las contraseñas
+        (radcheck y columnas de userinfo) nunca se incluyen.
+
+        :return: dict ``{username: {'user_id', 'raduserinfo', 'raduseracct',
+            'radcheck', 'radgroups'}}`` con valores serializables a JSON.
+        """
+        if isinstance(usernames, str):
+            usernames = [usernames]
+        usernames = [u for u in dict.fromkeys(usernames or []) if u]
+        if not usernames:
+            return {}
+
+        Db = self.env['todd.radius.db']
+        marks = ', '.join(['%s'] * len(usernames))
+        params = tuple(usernames)
+
+        usuarios, sesiones, checks, grupos = Db._execute_many([
+            (f"SELECT * FROM userinfo WHERE username IN ({marks})", params),
+            (
+                f"SELECT * FROM radacct WHERE username IN ({marks}) "
+                f"AND acctstoptime IS NULL",
+                params,
+            ),
+            (f"SELECT * FROM radcheck WHERE username IN ({marks})", params),
+            (
+                f"SELECT username, groupname, priority FROM radusergroup "
+                f"WHERE username IN ({marks}) ORDER BY username, priority",
+                params,
+            ),
+        ])
+
+        info = {}
+        for usuario in usuarios:
+            info[usuario.get('username') or ''] = {
+                'user_id': usuario.get('id'),
+                'raduserinfo': json_safe_row(usuario, USERINFO_EXCLUDE),
+                'raduseracct': [],
+                'radcheck': [],
+                'radgroups': [],
+            }
+
+        for fila in sesiones:
+            destino = info.get(fila.get('username'))
+            if destino is not None:
+                destino['raduseracct'].append(json_safe_row(fila))
+
+        for fila in checks:
+            if fila.get('attribute') in PASSWORD_ATTRS:
+                continue
+            destino = info.get(fila.get('username'))
+            if destino is not None:
+                destino['radcheck'].append(json_safe_row(fila))
+
+        for fila in grupos:
+            destino = info.get(fila.get('username'))
+            if destino is not None:
+                destino['radgroups'].append(json_safe_row(fila))
+
+        return info
+
+    @api.model
+    def radius_info_usuario(self, username):
+        """Info RADIUS de un usuario (por ``username``) o ``False`` si no existe."""
+        username = (username or '').strip()
+        if not username:
+            return False
+        return self.radius_info_usuarios([username]).get(username) or False
 
     def action_test_connection(self):
         ok = self.env['todd.radius.db']._test_connection()

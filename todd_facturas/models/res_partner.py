@@ -1,12 +1,8 @@
 import logging
 
-import requests
-
 from odoo import models, fields, api
 
 _logger = logging.getLogger(__name__)
-
-RADIUS_URL = 'https://radius-gestion.todd.com.ar/radius/user_info/data'
 
 
 class ResPartner(models.Model):
@@ -186,70 +182,57 @@ class ResPartner(models.Model):
 
     @api.model
     def _todd_consultar_radius(self, numero_cliente):
-        config = self.env['ir.config_parameter'].sudo()
-        api_key = (config.get_param('todd.radius_api_key') or '').strip()
-        base = (config.get_param('todd.radius_url', RADIUS_URL) or RADIUS_URL).strip().rstrip('/')
-        if not api_key:
-            return False, 'API key de Radius no configurada'
+        """Info RADIUS de un usuario, leída directo de la base de RADIUS.
+
+        Devuelve ``(data, error)``.
+        """
         if not numero_cliente:
             return False, 'Sin número de cliente para Radius'
         try:
-            response = requests.get(
-                f'{base}/{numero_cliente}',
-                headers={'X-Api-Key': api_key, 'Accept': 'application/json'},
-                params={'apikey': api_key},
-                timeout=15,
-            )
-            try:
-                data = response.json()
-            except ValueError:
-                _logger.warning(
-                    'Radius respuesta no JSON status=%s body=%s',
-                    response.status_code, (response.text or '')[:500],
-                )
-                return False, f'Radius status {response.status_code}'
-            if response.status_code >= 400:
-                error = data.get('error') or data.get('message') or f'Radius status {response.status_code}'
-                return data, error
-            return data, False
+            data = self.env['todd.radius.userinfo'].radius_info_usuario(numero_cliente)
         except Exception:
             _logger.exception('Radius consulta falló para %s', numero_cliente)
             return False, 'No se pudo conectar con Radius'
+        if not data:
+            error = 'Cliente no encontrado'
+            return {'error': error}, error
+        return data, False
 
     def _todd_consultar_radius_servicios(self):
-        config = self.env['ir.config_parameter'].sudo()
-        api_key = (config.get_param('todd.radius_api_key') or '').strip()
-        base = (config.get_param('todd.radius_url', RADIUS_URL) or RADIUS_URL).strip().rstrip('/')
-        if not api_key:
-            return {}
+        """Info RADIUS de los servicios de Internet del partner.
 
+        Devuelve ``{servicio_id: {'data': dict|False, 'error': str|False}}``.
+        """
         serviciosInternet = self.env['todd.servicio'].search([
             ('partner_id', 'in', self.ids),
             ('tipo', '=', 'I'),
             ('nombre_usuario', '!=', False),
         ])
+        if not serviciosInternet:
+            return {}
+
+        try:
+            info = self.env['todd.radius.userinfo'].radius_info_usuarios(
+                serviciosInternet.mapped('nombre_usuario')
+            )
+        except Exception:
+            _logger.exception(
+                'Radius consulta falló para servicios %s',
+                serviciosInternet.ids,
+            )
+            return {
+                svc.id: {'data': False, 'error': 'No se pudo conectar con Radius'}
+                for svc in serviciosInternet
+            }
 
         resultados = {}
         for svc in serviciosInternet:
-            try:
-                response = requests.get(
-                    f'{base}/{svc.nombre_usuario}',
-                    headers={'X-Api-Key': api_key, 'Accept': 'application/json'},
-                    params={'apikey': api_key},
-                    timeout=15,
-                )
-                try:
-                    data = response.json()
-                except ValueError:
-                    data = {'error': f'Radius status {response.status_code}'}
-                if response.status_code >= 400:
-                    error = data.get('error') or data.get('message') or f'Radius status {response.status_code}'
-                    resultados[svc.id] = {'data': data, 'error': error}
-                else:
-                    resultados[svc.id] = {'data': data, 'error': False}
-            except Exception:
-                _logger.exception('Radius consulta falló para servicio %s (%s)', svc.id, svc.nombre_usuario)
-                resultados[svc.id] = {'data': False, 'error': 'No se pudo conectar con Radius'}
+            data = info.get(svc.nombre_usuario)
+            if data:
+                resultados[svc.id] = {'data': data, 'error': False}
+            else:
+                error = 'Cliente no encontrado'
+                resultados[svc.id] = {'data': {'error': error}, 'error': error}
         return resultados
 
     @api.model
