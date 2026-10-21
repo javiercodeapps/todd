@@ -62,25 +62,31 @@ class ToddRadiusUserinfo(models.Model):
         """)
         fdw_ready = self.env.cr.fetchone()[0]
         if fdw_ready:
-            self.env.cr.execute("""
-                CREATE OR REPLACE VIEW todd_radius_userinfo AS
-                SELECT id, id AS radius_id, username, firstname, lastname, email, department, company,
-                       workphone, homephone, mobilephone, address, notes, city, state, country, zip,
-                       changeuserinfo::boolean, enableportallogin::boolean, tv::boolean,
-                       tvuser, tvpass, portalloginpassword,
-                       creationdate, updatedate, creationby, updateby
-                FROM userinfo
-            """)
+            try:
+                self.env.cr.execute("""
+                    CREATE OR REPLACE VIEW todd_radius_userinfo AS
+                    SELECT id, id AS radius_id, username, firstname, lastname, email, department, company,
+                           workphone, homephone, mobilephone, address, notes, city, state, country, zip,
+                           changeuserinfo::boolean, enableportallogin::boolean, tv::boolean,
+                           tvuser, tvpass, portalloginpassword,
+                           creationdate, updatedate, creationby, updateby
+                    FROM userinfo
+                """)
+            except Exception:
+                self.env.cr.rollback()
+                _logger.error('TODD RADIUS: init() userinfo - error creando vista FDW, revisar columnas de userinfo')
+                fdw_ready = False
         else:
             self.env.cr.execute("""
                 CREATE OR REPLACE VIEW todd_radius_userinfo AS
-                SELECT 1 AS radius_id, NULL::varchar AS username, NULL::varchar AS firstname,
-                       NULL::varchar AS lastname, NULL::varchar AS email, NULL::varchar AS department,
-                       NULL::varchar AS company, NULL::varchar AS workphone, NULL::varchar AS homephone,
-                       NULL::varchar AS mobilephone, NULL::text AS address, NULL::text AS notes,
-                       NULL::varchar AS city, NULL::varchar AS state, NULL::varchar AS country,
-                       NULL::varchar AS zip, FALSE AS changeuserinfo, FALSE AS enableportallogin,
-                       FALSE AS tv, NULL::varchar AS tvuser, NULL::varchar AS tvpass,
+                SELECT NULL::integer AS id, 1 AS radius_id, NULL::varchar AS username,
+                       NULL::varchar AS firstname, NULL::varchar AS lastname, NULL::varchar AS email,
+                       NULL::varchar AS department, NULL::varchar AS company, NULL::varchar AS workphone,
+                       NULL::varchar AS homephone, NULL::varchar AS mobilephone, NULL::text AS address,
+                       NULL::text AS notes, NULL::varchar AS city, NULL::varchar AS state,
+                       NULL::varchar AS country, NULL::varchar AS zip,
+                       FALSE AS changeuserinfo, FALSE AS enableportallogin, FALSE AS tv,
+                       NULL::varchar AS tvuser, NULL::varchar AS tvpass,
                        NULL::varchar AS portalloginpassword, NULL::timestamp AS creationdate,
                        NULL::timestamp AS updatedate, NULL::varchar AS creationby, NULL::varchar AS updateby
                 WHERE FALSE

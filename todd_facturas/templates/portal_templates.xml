@@ -190,7 +190,7 @@
                                         </div>
                                     </div>
 
-                                        <t t-set="codigo_billetera" t-value="factura.cod_pago_electronico or factura.cod_pago_electronico_otros"/>
+                                        <t t-set="codigo_billetera" t-value="factura.cod_pago_electronico_otros"/>
                                         <div class="col-12" t-if="codigo_billetera">
                                             <div class="card">
                                                 <div class="card-body">
@@ -242,7 +242,7 @@
                                                         </div>
                                                         <div class="col-md-6 text-center">
                                                             <div class="d-flex align-items-center justify-content-center gap-2 flex-wrap mb-3">
-                                                                <span class="fs-3 font-monospace" id="codigo_dni" t-esc="factura.servicio_id.nro_usuario"/>
+                                                                <span class="fs-3 font-monospace" id="codigo_dni" t-esc="factura.cod_pago_electronico"/>
                                                                 <button type="button" class="btn btn-sm btn-outline-secondary"
                                                                         onclick="navigator.clipboard.writeText(document.getElementById('codigo_dni').innerText)">
                                                                     <i class="fa fa-copy"/> Copiar
@@ -263,7 +263,7 @@
                                                     <p class="text-muted">Home banking Credicoop, BIP y otros bancos de la red Link</p>
                                                     <p class="mb-2"><strong>Cód. LINK PAGO</strong></p>
                                                     <div class="d-flex align-items-center justify-content-center gap-2 flex-wrap">
-                                                        <span class="fs-3 font-monospace" id="codigo_link" t-esc="factura.servicio_id.nro_usuario"/>
+                                                        <span class="fs-3 font-monospace" id="codigo_link" t-esc="factura.cod_pago_electronico"/>
                                                         <button type="button" class="btn btn-sm btn-outline-secondary"
                                                                 onclick="navigator.clipboard.writeText(document.getElementById('codigo_link').innerText)">
                                                             <i class="fa fa-copy"/> Copiar
@@ -273,25 +273,8 @@
                                             </div>
                                         </div>
 
-                                        <!-- Transferencia -->
-                                        <div class="col-md-6">
-                                            <div class="card h-100">
-                                                <div class="card-body text-center">
-                                                    <i class="fa fa-university fa-3x text-primary mb-3"/>
-                                                    <h5>Transferencia Bancaria</h5>
-                                                    <p class="text-muted">Realice una transferencia a nuestra cuenta</p>
-                                                    <div class="text-start bg-light p-3 rounded">
-                                                        <p class="mb-1"><strong>Banco:</strong> Banco de la Nación Argentina</p>
-                                                        <p class="mb-1"><strong>Cuenta:</strong> Caja de Ahorro en Pesos</p>
-                                                        <p class="mb-1"><strong>CBU:</strong> 00701049 3000 4005 4893 26</p>
-                                                        <p class="mb-0"><strong>Titular:</strong> Cooperativa de Servicios Públicos Todd Ltda</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
                                         <!-- Débito automático -->
-                                        <div class="col-md-6">
+                                        <div class="col-md-12">
                                             <div class="card h-100">
                                                 <div class="card-body text-center">
                                                     <i class="fa fa-calendar-check-o fa-3x text-success mb-3"/>
