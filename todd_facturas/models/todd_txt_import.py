@@ -214,7 +214,7 @@ class ToddTxtImport(models.Model):
             if pdf_ruta and existe.archivo_pdf_ruta != pdf_ruta:
                 vals['archivo_pdf'] = lp['archivo_pdf']
                 vals['archivo_pdf_ruta'] = pdf_ruta
-            if lp.get('servicio_id') and existe.servicio_id != lp['servicio_id']:
+            if lp.get('servicio_id') and existe.servicio_id.id != lp['servicio_id']:
                 vals['servicio_id'] = lp['servicio_id']
             if vals:
                 existe.write(vals)
