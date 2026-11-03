@@ -325,4 +325,46 @@
             </div>
         </t>
     </template>
+
+    <!-- Acceso directo del portal: "Conexión y Seguridad" -> "Cambio de Contraseña" -->
+    <template id="portal_home_security_card_password" name="Portal: acceso directo a cambio de contraseña" inherit_id="portal.portal_my_home">
+        <xpath expr="//t[@t-set='title'][text()='Connection &amp; Security']" position="replace">
+            <t t-set="title">Cambio de Contraseña</t>
+        </xpath>
+        <xpath expr="//t[@t-set='text'][text()='Configure your connection parameters']" position="replace">
+            <t t-set="text">Cambie su contraseña de acceso al portal</t>
+        </xpath>
+    </template>
+
+    <!-- /my/security: dejar visible únicamente el cambio de contraseña -->
+    <template id="portal_my_security_password_only" name="Portal: solo cambio de contraseña" inherit_id="portal.portal_my_security">
+        <xpath expr="//t[@t-set='additional_title']" position="replace">
+            <t t-set="additional_title">Cambio de Contraseña</t>
+        </xpath>
+        <xpath expr="//div[hasclass('o_portal_security_body')]//h3" position="replace">
+            <h3 class="my-0">Cambio de Contraseña</h3>
+        </xpath>
+        <xpath expr="//section[@name='portal_change_password']" position="before">
+            <style>
+                /* Ocultar cualquier otra sección de la página (revocar sesiones,
+                   2FA, passkeys, API keys, baja de cuenta, etc.) */
+                .o_portal_security_body section:not([name='portal_change_password']) {
+                    display: none !important;
+                }
+                /* El título de la sección repite el título de la página */
+                .o_portal_security_body section[name='portal_change_password'] > h4 {
+                    display: none !important;
+                }
+            </style>
+        </xpath>
+        <xpath expr="//section[@name='portal_revoke_all_devices_popup']" position="attributes">
+            <attribute name="t-if">False</attribute>
+        </xpath>
+        <xpath expr="//section[@t-if='debug and allow_api_keys']" position="attributes">
+            <attribute name="t-if">False</attribute>
+        </xpath>
+        <xpath expr="//section[@groups='base.group_portal']" position="attributes">
+            <attribute name="t-if">False</attribute>
+        </xpath>
+    </template>
 </odoo>
