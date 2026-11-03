@@ -24,6 +24,18 @@ class TestPortalSoloPassword(HttpCase):
         self.assertNotIn('Connection &amp; Security', html)
         self.assertNotIn('Conexión y Seguridad', html)
 
+    def test_home_con_vista_traducida(self):
+        """La herencia del portal no debe depender del texto traducido (arch_db)."""
+        lang = self.env['res.lang'].search(
+            [('code', 'in', ('es_ES', 'es_AR', 'es_419'))], limit=1)
+        if not lang:
+            self.skipTest('No hay idioma español instalado en la base')
+        self.portal_user.lang = lang.code
+        self.authenticate('portal_seguridad_test', 'portal_seguridad_test')
+        response = self.url_open('/my/home')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Cambio de Contraseña', response.text)
+
     def test_security_solo_cambio_password(self):
         self.authenticate('portal_seguridad_test', 'portal_seguridad_test')
         html = self.url_open('/my/security').text

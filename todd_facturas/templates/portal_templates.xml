@@ -328,10 +328,14 @@
 
     <!-- Acceso directo del portal: "Conexión y Seguridad" -> "Cambio de Contraseña" -->
     <template id="portal_home_security_card_password" name="Portal: acceso directo a cambio de contraseña" inherit_id="portal.portal_my_home">
-        <xpath expr="//t[@t-set='title'][text()='Connection &amp; Security']" position="replace">
+        <!-- La tarjeta se localiza por su URL y no por su texto: el arch de las
+             vistas de Odoo se traduce por idioma (arch_db), así que un xpath
+             con text() deja de encontrar el nodo cuando el usuario no usa en_US
+             y la vista entera falla al combinarse. -->
+        <xpath expr="//t[@t-call='portal.portal_docs_entry'][t[@t-set='url'][contains(@t-value, '/my/security')]]/t[@t-set='title']" position="replace">
             <t t-set="title">Cambio de Contraseña</t>
         </xpath>
-        <xpath expr="//t[@t-set='text'][text()='Configure your connection parameters']" position="replace">
+        <xpath expr="//t[@t-call='portal.portal_docs_entry'][t[@t-set='url'][contains(@t-value, '/my/security')]]/t[@t-set='text']" position="replace">
             <t t-set="text">Cambie su contraseña de acceso al portal</t>
         </xpath>
     </template>
