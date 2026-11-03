@@ -284,6 +284,11 @@
                                                         <p class="mb-1"><strong>Próximo débito:</strong> <t t-esc="factura.fecha_vencimiento" t-options="{'widget':'date'}"/></p>
                                                         <p class="mb-0"><strong>Monto:</strong> <t t-esc="factura.importe" t-options="{'widget':'monetary','display_currency':factura.env.company.currency_id}"/></p>
                                                     </div>
+                                                    <div class="mt-3">
+                                                        <a href="https://wa.me/5492474661343" class="btn btn-success" target="_blank" rel="noopener noreferrer">
+                                                            <i class="fa fa-whatsapp"/> Consultar por WhatsApp
+                                                        </a>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -295,7 +300,7 @@
                                                     <i class="fa fa-map-marker fa-3x text-info mb-3"/>
                                                     <h5>Pago en Sucursal</h5>
                                                     <p class="text-muted">Puede abonar en efectivo o con tarjeta en nuestras oficinas</p>
-                                                    <p class="mb-0"><strong>Dirección:</strong> Av. Independencia 264 - Pehuajó, Buenos Aires</p>
+                                                    <p class="mb-0"><strong>Dirección:</strong>Ruta 8 km y Sarmiento - Todd</p>
                                                 </div>
                                             </div>
                                         </div>
