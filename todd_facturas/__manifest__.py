@@ -1,6 +1,6 @@
 {
     'name': "Todd Facturas",
-    'version': '19.0.2.1.1',
+    'version': '19.0.2.2.0',
     'depends': ['base', 'portal', 'queue_job', 'todd_radius'],
     'author': "Todd",
     'category': 'Accounting',
@@ -17,6 +17,7 @@
         'views/todd_menu.xml',
         'data/todd_cron.xml',
         'templates/portal_templates.xml',
+        'templates/login_templates.xml',
     ],
     'installable': True,
     'application': True,

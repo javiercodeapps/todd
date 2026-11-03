@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="login_dni_legend" name="Login: leyenda DNI" inherit_id="web.login">
+        <xpath expr="//div[hasclass('field-login')]" position="before">
+            <div class="alert alert-info small mb-3" role="note">
+                <strong>Primer ingreso:</strong>
+                use su número de DNI como usuario y contraseña.
+            </div>
+        </xpath>
+    </template>
+</odoo>
