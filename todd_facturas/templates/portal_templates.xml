@@ -4,6 +4,7 @@
         <t t-call="portal.portal_layout">
             <t t-set="breadcrumbs_searchbar" t-value="True"/>
             <t t-call="portal.portal_searchbar"/>
+            <h2 class="mb-4" t-out="partner_name"/>
             <t t-if="facturas">
                 <div class="mb-3 text-muted">
                     Mostrando <t t-out="page_start"/> - <t t-out="page_end"/> de <t t-out="total"/> facturas
@@ -337,6 +338,15 @@
         </xpath>
         <xpath expr="//t[@t-call='portal.portal_docs_entry'][t[@t-set='url'][contains(@t-value, '/my/security')]]/t[@t-set='text']" position="replace">
             <t t-set="text">Cambie su contraseña de acceso al portal</t>
+        </xpath>
+    </template>
+
+    <!-- Acceso directo del portal: la tarjeta "Sus facturas" del inicio
+         apunta a /my/facturas (facturas de todd.factura) en lugar de a la
+         vista de facturas de contabilidad. -->
+    <template id="portal_home_invoice_card_link" name="Portal: tarjeta de facturas hacia Mis Facturas" inherit_id="account.portal_my_home_invoice">
+        <xpath expr="//div[@id='portal_client_category']//t[@t-set='url'][contains(@t-value, '/my/invoices')]" position="replace">
+            <t t-set="url" t-value="'/my/facturas'"/>
         </xpath>
     </template>
 

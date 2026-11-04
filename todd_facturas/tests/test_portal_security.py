@@ -36,6 +36,20 @@ class TestPortalSoloPassword(HttpCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('Cambio de Contraseña', response.text)
 
+    def test_home_tarjeta_facturas_apunta_a_mis_facturas(self):
+        """La tarjeta de facturas del inicio lleva a /my/facturas."""
+        self.authenticate('portal_seguridad_test', 'portal_seguridad_test')
+        html = self.url_open('/my/home').text
+        self.assertIn('href="/my/facturas"', html)
+        self.assertNotIn('href="/my/invoices?filterby=invoices"', html)
+
+    def test_facturas_muestra_nombre_usuario(self):
+        """/my/facturas muestra el nombre del usuario como encabezado."""
+        self.authenticate('portal_seguridad_test', 'portal_seguridad_test')
+        response = self.url_open('/my/facturas')
+        self.assertEqual(response.status_code, 200)
+        self.assertRegex(response.text, r'<h2 class="mb-4">\s*Portal Seguridad\s*</h2>')
+
     def test_security_solo_cambio_password(self):
         self.authenticate('portal_seguridad_test', 'portal_seguridad_test')
         html = self.url_open('/my/security').text

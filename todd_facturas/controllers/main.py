@@ -27,6 +27,7 @@ class ToddPortal(http.Controller):
 
         values = {
             'facturas': facturas,
+            'partner_name': partner.name,
             'page': page,
             'total_pages': total_pages,
             'total': total,
