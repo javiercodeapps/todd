@@ -351,20 +351,19 @@
     </template>
 
     <!-- Acceso directo del portal: tarjeta hacia el Webmail institucional.
-         Se inserta después de la tarjeta de facturas (anclada por URL), para
-         no depender del id del contenedor de tarjetas de Odoo 19. -->
-    <template id="portal_home_webmail_card" name="Portal: tarjeta de Webmail" inherit_id="portal.portal_my_home">
-        <xpath expr="//t[@t-call='portal.portal_docs_entry'][t[@t-set='url'][contains(@t-value, '/my/facturas')]]" position="after">
+    Se inserta dentro del contenedor de tarjetas del portal (o_portal_docs),
+    que es el punto de anclaje estable en Odoo 19. -->
+    <template id="portal_home_webmail_card" name="Portal: tarjeta de Webmail" inherit_id="portal.portal_my_home" priority="99">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
             <t t-call="portal.portal_docs_entry">
                 <t t-set="icon" t-value="'/web/static/img/icons/mail.svg'"/>
                 <t t-set="title">Webmail</t>
                 <t t-set="text">Acceda a su correo</t>
                 <t t-set="url" t-value="'https://mail.todd.com.ar/mail/'"/>
-                <t t-set="placeholder_count" t-value="0"/>
+                <t t-set="config_card" t-value="True"/>
             </t>
         </xpath>
     </template>
-
     <!-- /my/security: dejar visible únicamente el cambio de contraseña -->
     <template id="portal_my_security_password_only" name="Portal: solo cambio de contraseña" inherit_id="portal.portal_my_security">
         <xpath expr="//t[@t-set='additional_title']" position="replace">
