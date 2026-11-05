@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" stroke="currentColor" stroke-width="32" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M48 112C48 94.3 62.3 80 80 80H432C449.7 80 464 94.3 464 112V400C464 417.7 449.7 432 432 432H80C62.3 432 48 417.7 48 400V112Z" />
-    <path d="M48 112L256 272L464 112" />
+<!-- Pictograma de correo para el portal.
+     Importante: llevar width/height explicitos (64x64). Si solo se declara
+     viewBox, el navegador renderiza el <img> al tamanio por defecto
+     (300x150 -> 150x150) y el icono se ve desproporcionado frente al resto
+     de las tarjetas. Los colores tambien deben ser literales: un SVG cargado
+     via <img> no hereda `currentColor` del documento HTML. -->
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="7" y="15" width="50" height="34" rx="4" fill="#C1DBF6" stroke="#374874" stroke-width="2.5"/>
+    <path d="M8.5 17 32 34.5 55.5 17" fill="#FBDBD0" stroke="#374874" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
