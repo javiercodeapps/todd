@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" stroke="currentColor" stroke-width="32" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M48 112C48 94.3 62.3 80 80 80H432C449.7 80 464 94.3 464 112V400C464 417.7 449.7 432 432 432H80C62.3 432 48 417.7 48 400V112Z" />
-    <path d="M48 112L256 272L464 112" />
-</svg>
