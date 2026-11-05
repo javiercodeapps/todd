@@ -360,7 +360,15 @@
     <template id="portal_home_webmail_card" name="Portal: tarjeta de Webmail" inherit_id="portal.portal_my_home" priority="99">
         <xpath expr="//div[@id='portal_client_category']" position="inside">
             <t t-call="portal.portal_docs_entry">
-                <t t-set="icon" t-value="'/todd_facturas/static/src/img/mail.svg'"/>
+                <!-- A proposito el archivo se llama email.svg y NO mail.svg:
+                     la URL /static/src/img/mail.svg quedo cacheada en
+                     Cloudflare (max-age=604800) con un JPEG servido como
+                     image/svg+xml. Sin acceso a la CDN, la unica forma de
+                     invalidar esa entrada es cambiar la URL. No volver a
+                     usar mail.svg. Si en el futuro se cambia el contenido
+                     del icono, usar un nombre o un query nuevo (email.svg?v=N)
+                     para evitar el mismo problema. -->
+                <t t-set="icon" t-value="'/todd_facturas/static/src/img/email.svg'"/>
                 <t t-set="title">Webmail</t>
                 <t t-set="text">Acceda a su correo</t>
                 <t t-set="url" t-value="'https://mail.todd.com.ar/mail/'"/>
