@@ -50,6 +50,7 @@ class ToddPortal(http.Controller):
         hoy = date.today()
         dias_deuda = (hoy - factura.fecha_emision).days if factura.fecha_emision else 0
         mas_90_dias = dias_deuda > 90
+        pago_provincianet_bloqueado = factura.provincianet_bloqueada()
 
         values = {
             'factura': factura,
@@ -57,6 +58,11 @@ class ToddPortal(http.Controller):
             'mas_90_dias': mas_90_dias,
             'error_provincianet': error == 'provincianet',
             'error_provincianet_msg': error_msg or '',
+            'pago_provincianet_bloqueado': pago_provincianet_bloqueado,
+            'provincianet_vencido_msg': (
+                factura.provincianet_mensaje_vencido()
+                if pago_provincianet_bloqueado else ''
+            ),
         }
         return request.render('todd_facturas.portal_pago', values)
 

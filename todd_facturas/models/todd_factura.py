@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from datetime import date
+from datetime import date, datetime
 
 import requests
 
@@ -18,6 +18,44 @@ SERVICIOS = {
     'S': 'Sepelio',
     'N': 'Nichos',
 }
+
+PROVINCIANET_VENCIDO_MSG = (
+    'El código de pago de esta factura%s está vencido y Provincia NET no '
+    'acepta facturas vencidas. Puede abonar con las otras opciones de pago '
+    'de esta página (billeteras virtuales, Pagos Link, débito automático o '
+    'en sucursal) o comunicarse con cobranzas.'
+)
+
+
+def decodificar_codigo_pago(barcode):
+    """Extrae vencimientos e importes de un código de pago electrónico.
+
+    Los primeros 12 dígitos identifican al servicio; el resto depende del
+    formato (los importes están expresados en centavos):
+
+    - 30 dígitos: ``DDMMYY`` + 10 dígitos de importe + 2 de verificación.
+    - 40 dígitos: ``DDMMYY`` + 7 + ``DDMMYY`` + 7 + 2 (1er y 2do vencimiento).
+
+    Devuelve una lista de ``(fecha_vencimiento, importe)`` ordenada por fecha,
+    o ``[]`` si el código no es reconocible. No depende de Odoo para poder
+    testearse de forma aislada.
+    """
+    if not barcode or not barcode.isdigit() or len(barcode) not in (30, 40):
+        return []
+    try:
+        if len(barcode) == 30:
+            periodos = [(barcode[12:18], barcode[18:28])]
+        else:
+            periodos = [
+                (barcode[12:18], barcode[18:25]),
+                (barcode[25:31], barcode[31:38]),
+            ]
+        return sorted(
+            (datetime.strptime(fecha, '%d%m%y').date(), int(importe) / 100)
+            for fecha, importe in periodos
+        )
+    except (ValueError, TypeError):
+        return []
 
 
 class ToddFactura(models.Model):
@@ -66,15 +104,61 @@ class ToddFactura(models.Model):
             r.estado_pago = 'pagado'
         return True
 
+    def provincianet_vencimiento(self):
+        """Fecha límite real del código de pago que se envía a Provincia NET.
+
+        El vencimiento embebido en el código de barras manda: es lo que valida
+        el proveedor (un código vencido responde 422 "El servicio se encuentra
+        vencido"). `fecha_vencimiento` se usa sólo como respaldo cuando el
+        código no se puede decodificar.
+        """
+        self.ensure_one()
+        periodos = decodificar_codigo_pago(self.cod_pago_electronico_otros)
+        if periodos:
+            return periodos[-1][0]
+        return self.fecha_vencimiento or None
+
+    def provincianet_bloqueada(self):
+        """True si el proveedor rechazará el preorder por código vencido."""
+        self.ensure_one()
+        vencimiento = self.provincianet_vencimiento()
+        return bool(vencimiento and vencimiento < date.today())
+
+    def provincianet_mensaje_vencido(self):
+        """Explicación para el portal cuando este medio de pago no aplica."""
+        self.ensure_one()
+        vencimiento = self.provincianet_vencimiento()
+        detalle = (
+            f' (venció el {vencimiento.strftime("%d/%m/%Y")})'
+            if vencimiento else ''
+        )
+        return PROVINCIANET_VENCIDO_MSG % detalle
+
     def generar_url_provincianet(self):
         self.ensure_one()
+        # Provincia NET valida la fecha de vencimiento del código de barras:
+        # si ya pasó, responde 422. Evitamos el POST (y los reintentos del
+        # usuario) cuando sabemos de antemano que va a ser rechazado.
+        if self.provincianet_bloqueada():
+            _logger.warning(
+                'Provincia NET preorder bloqueado factura=%s código vencido el %s',
+                self.id, self.provincianet_vencimiento(),
+            )
+            return False, self.provincianet_mensaje_vencido()
+
         partner = self.partner_id
         partes = (partner.name or '').split()
         last_name = partes[0] if partes else ''
         first_name = ' '.join(partes[1:]) if len(partes) > 1 else last_name
 
         hoy = date.today()
-        if self.fecha_vencimiento and hoy > self.fecha_vencimiento:
+        # El importe del payload debe coincidir con el codificado en el
+        # barcode; si difiere, el proveedor lo rechaza por inconsistencia.
+        periodos = decodificar_codigo_pago(self.cod_pago_electronico_otros)
+        if periodos:
+            vigentes = [(f, m) for f, m in periodos if f >= hoy]
+            monto = vigentes[0][1] if vigentes else self.importe
+        elif self.fecha_vencimiento and hoy > self.fecha_vencimiento:
             monto = self.importe_2do_vencimiento or self.importe
         else:
             monto = self.importe
@@ -111,10 +195,11 @@ class ToddFactura(models.Model):
             'u1kRIYc6d9NSSHDsdbczTMChD4qSaQUPbw3M5ijg52GnW2du2m',
         ) or '').strip()
         _logger.warning(
-            'Provincia NET preorder factura=%s barcode=%s amount=%s payload=%s api_key_len=%s',
+            'Provincia NET preorder factura=%s barcode=%s amount=%s vencimiento=%s payload=%s api_key_len=%s',
             self.id,
             payload['payments'][0]['barcode'],
             payload['payments'][0]['amount'],
+            self.provincianet_vencimiento(),
             json.dumps(payload, ensure_ascii=False),
             len(api_key),
         )

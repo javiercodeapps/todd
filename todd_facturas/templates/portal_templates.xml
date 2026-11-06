@@ -169,16 +169,23 @@
                                 <div class="card-body">
                                     <p class="fs-5">Su factura tiene <strong><t t-out="dias_deuda"/></strong> días de antigüedad.</p>
                                     <p>Seleccione una opción de pago:</p>
-                                    <t t-if="error_provincianet">
+                                    <t t-if="error_provincianet and not pago_provincianet_bloqueado">
                                         <div class="alert alert-danger">
                                             <t t-esc="error_provincianet_msg or 'No se pudo generar el link de pago de Provincia NET.'"/>
                                             Intente nuevamente o use otra forma de pago.
                                         </div>
                                     </t>
+                                    <t t-if="pago_provincianet_bloqueado">
+                                        <div class="alert alert-warning" role="alert">
+                                            <i class="fa fa-exclamation-triangle"/>
+                                            <t t-esc="provincianet_vencido_msg"/>
+                                            <span> Por este motivo la opción de Provincia NET no está disponible para esta factura.</span>
+                                        </div>
+                                    </t>
 
                                     <div class="row g-3 mt-3">
                                         <!-- Provincia NET -->
-                                        <div class="col-12">
+                                        <div class="col-12" t-if="not pago_provincianet_bloqueado">
                                             <div class="card border-primary">
                                                 <div class="card-body text-center">
                                                     <i class="fa fa-credit-card fa-3x text-primary mb-3"/>
