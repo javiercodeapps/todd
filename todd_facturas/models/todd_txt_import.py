@@ -146,12 +146,32 @@ class ToddTxtImport(models.Model):
                 if not partner:
                     raise
 
-        partner.crear_usuario_portal_si_no_tiene()
+        # El alta del usuario portal es accesoria. Si falla (p.ej. login ya
+        # tomado por otro lote concurrente) no debe revertir el partner: es la
+        # FK que necesitan todd_servicio y todd_factura. Un rollback del
+        # savepoint exterior dejaría un ID huérfano en la caché del lote.
+        try:
+            with self.env.cr.savepoint():
+                partner.crear_usuario_portal_si_no_tiene()
+        except Exception:
+            _logger.exception(
+                'TODD: usuario portal no creado para partner %s (DNI %s)',
+                partner.id, dni,
+            )
         return partner, created
 
     @api.model
     def _get_or_create_servicio(self, partner, lp):
         Servicio = self.env['todd.servicio']
+        # Verificación previa al INSERT. browse(id) NO consulta la BD: un ID
+        # huérfano en la caché llegaría hasta PostgreSQL y rompería la FK
+        # todd_servicio_partner_id_fkey con un error críptico.
+        partner = partner.exists()
+        if not partner:
+            raise ValueError(
+                f"No existe res.partner para DNI {lp.get('dni')}; "
+                "no se puede insertar el servicio"
+            )
         servicio = Servicio.search([
             ('partner_id', '=', partner.id),
             ('tipo', '=', lp['servicio']),
@@ -194,6 +214,62 @@ class ToddTxtImport(models.Model):
         return servicio, created
 
     @api.model
+    def _resolver_partner_para_linea(self, lp, partners_map):
+        """Devuelve ``(partner, created, error)`` con un partner que existe en la BD.
+
+        En Odoo 19 ``cr.savepoint()`` es un ``_FlushingSavepoint``: un error en
+        el flush al cerrar el savepoint revierte el INSERT del partner, pero no
+        deshace las mutaciones de un dict de Python. Si el ID se cachea dentro
+        del ``with`` queda huérfano y el posterior INSERT en ``todd_servicio``
+        viola la FK. Por eso se valida siempre con ``.exists()`` y se re-resuelve
+        por DNI cuando el ID ya no corresponde a ningún registro.
+        """
+        Partner = self.env['res.partner']
+        dni = lp['dni']
+        cached_id = partners_map.get(dni)
+        partner = Partner.browse(cached_id).exists() if cached_id else Partner
+        if partner:
+            return partner, False, None
+
+        # ID huérfano o primera aparición del DNI en el lote.
+        partners_map.pop(dni, None)
+        try:
+            with self.env.cr.savepoint():
+                nuevo, created = self._get_or_create_partner_todd(lp)
+            # Cachear SÓLO después de liberado el savepoint (flush incluido).
+            if not nuevo.exists():
+                return Partner, False, 'partner inexistente tras resolverlo'
+            partners_map[dni] = nuevo.id
+            return nuevo, created, None
+        except Exception as e:
+            _logger.exception('TODD: partner DNI %s no resuelto', dni)
+            return Partner, False, str(e)
+
+    @api.model
+    def _resolver_servicio_para_linea(self, partner, lp, servicios_map):
+        """Análogo a ``_resolver_partner_para_linea`` para ``todd.servicio``."""
+        Servicio = self.env['todd.servicio']
+        key = (partner.id, lp['servicio'], lp['nro_usuario'])
+        cached_id = servicios_map.get(key)
+        servicio = Servicio.browse(cached_id).exists() if cached_id else Servicio
+        if servicio:
+            return servicio, False, None
+
+        servicios_map.pop(key, None)
+        try:
+            with self.env.cr.savepoint():
+                nuevo, created = self._get_or_create_servicio(partner, lp)
+            if not nuevo.exists():
+                return Servicio, False, 'servicio inexistente tras resolverlo'
+            servicios_map[key] = nuevo.id
+            return nuevo, created, None
+        except Exception as e:
+            _logger.exception(
+                'TODD: servicio socio %s no resuelto', lp['nro_socio'],
+            )
+            return Servicio, False, str(e)
+
+    @api.model
     def _pdf_ruta(self, source_dir, archivo_pdf):
         src = os.path.join(source_dir, archivo_pdf) if archivo_pdf else ''
         return src if src and os.path.exists(src) else ''
@@ -224,6 +300,16 @@ class ToddTxtImport(models.Model):
         limite = date.today() - relativedelta(years=1)
         if lp['fecha_fac'] and lp['fecha_fac'] < limite:
             return 'skipped'
+
+        # Antes del INSERT: verificar que las FKs siguen existiendo. Los IDs
+        # vienen de la caché del lote y un savepoint revertido puede dejarlos
+        # huérfanos (browse() no consulta la BD).
+        partner_id = lp['partner_id']
+        if not self.env['res.partner'].browse(partner_id).exists():
+            raise ValueError(f'partner_id {partner_id} no existe en res_partner')
+        servicio_id = lp.get('servicio_id')
+        if servicio_id and not self.env['todd.servicio'].browse(servicio_id).exists():
+            raise ValueError(f'servicio_id {servicio_id} no existe en todd_servicio')
 
         try:
             with self.env.cr.savepoint():
@@ -406,43 +492,39 @@ class ToddTxtImport(models.Model):
                     continue
 
                 dni = parsed['dni']
-                if dni and dni != '0' and dni not in partners_map:
-                    try:
-                        with self.env.cr.savepoint():
-                            partner, created = self._get_or_create_partner_todd(parsed)
-                            partners_map[dni] = partner.id
-                            if created:
-                                partners_nuevos += 1
-                    except Exception as e:
-                        errores += 1
-                        log.append(f"Línea {i + 1}: ERROR partner DNI {dni} - {e}")
-                        _logger.exception('TODD: partner línea %s de %s', i + 1, self.filename)
-                        continue
-
-                partner_id = partners_map.get(dni)
-                if not partner_id:
+                if not dni or dni == '0':
                     errores += 1
                     log.append(f"Línea {i + 1}: sin DNI válido, omitida")
                     continue
 
-                svc_key = (partner_id, parsed['servicio'], parsed['nro_usuario'])
-                if svc_key not in servicios_map:
-                    try:
-                        with self.env.cr.savepoint():
-                            servicio, svc_created = self._get_or_create_servicio(
-                                self.env['res.partner'].browse(partner_id), parsed,
-                            )
-                            servicios_map[svc_key] = servicio.id
-                            if svc_created:
-                                servicios_nuevos += 1
-                    except Exception as e:
-                        errores += 1
-                        log.append(f"Línea {i + 1}: ERROR servicio {parsed['nro_socio']} - {e}")
-                        _logger.exception('TODD: servicio línea %s de %s', i + 1, self.filename)
-                        continue
+                partner, p_created, p_error = self._resolver_partner_para_linea(
+                    parsed, partners_map,
+                )
+                if p_error or not partner:
+                    errores += 1
+                    log.append(
+                        f"Línea {i + 1}: ERROR partner DNI {dni} - "
+                        f"{p_error or 'partner no disponible'}"
+                    )
+                    continue
+                if p_created:
+                    partners_nuevos += 1
 
-                parsed['partner_id'] = partner_id
-                parsed['servicio_id'] = servicios_map[svc_key]
+                servicio, svc_created, svc_error = self._resolver_servicio_para_linea(
+                    partner, parsed, servicios_map,
+                )
+                if svc_error or not servicio:
+                    errores += 1
+                    log.append(
+                        f"Línea {i + 1}: ERROR servicio {parsed['nro_socio']} - "
+                        f"{svc_error or 'servicio no disponible'}"
+                    )
+                    continue
+                if svc_created:
+                    servicios_nuevos += 1
+
+                parsed['partner_id'] = partner.id
+                parsed['servicio_id'] = servicio.id
                 lineas_parseadas.append(parsed)
             except Exception as e:
                 errores += 1
