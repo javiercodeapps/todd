@@ -17,4 +17,21 @@
             <attribute name="placeholder">DNI/CUIT</attribute>
         </xpath>
     </template>
+
+    <!-- Los usuarios del portal entran con DNI/CUIT, por lo que no tienen
+         passkey ni pueden restablecer la contraseña por correo. Se quitan:
+           * "- o -" y "Usa una llave de acceso": ambos salen de
+             web.login_oauth. auth_passkey (auto_instalado) agrega un botón a
+             auth_btns y el separador "- or -" sólo se dibuja cuando auth_btns
+             no está vacío. Al eliminar la llamada desaparecen los dos.
+           * "Restablecer contraseña": lo agrega auth_signup.login, que llega
+             al módulo vía portal -> auth_signup.
+         priority=99 es necesario porque esos nodos los insertan otras vistas
+         heredadas (auth_signup.login=16, auth_passkey_login=32); sin esta
+         prioridad el xpath no encontraría el enlace y fallaría el upgrade. -->
+    <template id="login_clean" name="Login: sin passkey ni restablecer contraseña"
+              inherit_id="web.login" priority="99">
+        <xpath expr="//t[@t-call='web.login_oauth']" position="replace"/>
+        <xpath expr="//a[@t-if='reset_password_enabled']" position="replace"/>
+    </template>
 </odoo>
