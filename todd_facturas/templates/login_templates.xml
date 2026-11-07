@@ -1,11 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <template id="login_dni_legend" name="Login: leyenda DNI" inherit_id="web.login">
+	<template id="login_dni_legend" name="Login: leyenda DNI/CUIT" inherit_id="web.login">
         <xpath expr="//div[hasclass('field-login')]" position="before">
             <div class="alert alert-info small mb-3" role="note">
                 <strong>Primer ingreso:</strong>
                 use su número de DNI como usuario y contraseña.
             </div>
+        </xpath>
+
+        <!-- El usuario del portal es el DNI/CUIT, no el correo electrónico -->
+        <xpath expr="//div[hasclass('field-login')]/label" position="replace">
+            <label for="login" class="form-label d-flex justify-content-between">DNI/CUIT</label>
+        </xpath>
+
+        <xpath expr="//div[hasclass('field-login')]/input" position="attributes">
+            <attribute name="placeholder">DNI/CUIT</attribute>
         </xpath>
     </template>
 </odoo>
