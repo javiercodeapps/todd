@@ -15,6 +15,10 @@ Qué hace
   bloquea la creación del ticket.
 * El job construye un payload con los campos básicos y crea un
   ``helpdesk.ticket`` en el servidor remoto con ``execute_kw``.
+* Antes de enviar, el cliente XML-RPC aplana los valores a tipos nativos:
+  los campos ``Html`` de Odoo (p. ej. ``description``) devuelven
+  ``markupsafe.Markup``, una subclase de ``str`` que ``xmlrpc.client`` no
+  puede serializar (``cannot marshal ... objects``). Ver ``_xmlrpc_safe``.
 * Guarda en el ticket local el estado, el id remoto, la fecha, el número de
   intentos y el último error. Hay un botón **"Reenviar al servidor"** y una
   pestaña *"Réplica a servidor"* en el formulario.

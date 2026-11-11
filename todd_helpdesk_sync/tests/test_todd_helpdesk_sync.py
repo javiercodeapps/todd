@@ -1,4 +1,7 @@
+import xmlrpc.client
 from unittest import mock
+
+from markupsafe import Markup
 
 from odoo.tests import TransactionCase
 
@@ -249,3 +252,59 @@ class TestToddHelpdeskSync(TransactionCase):
         with mock.patch.object(client_mod, "_server_proxy", return_value=proxy):
             with self.assertRaises(client_mod.ToddSyncConfigError):
                 client_mod.RemoteOdoo(config)
+
+    # ------------------------------------------------------------------
+    # Regresión: campos Html (markupsafe.Markup) y XML-RPC
+    # ------------------------------------------------------------------
+
+    def test_markup_is_not_natively_marshalable(self):
+        """Caracterización del bug: xmlrpc.client despacha por tipo exacto.
+
+        Odoo 17+ devuelve ``Markup`` (subclase de str) al leer campos Html;
+        sin aplanar, ``execute_kw`` ni siquiera llega a enviar la petición.
+        """
+        with self.assertRaises(TypeError):
+            xmlrpc.client.dumps(([{"description": Markup("<p>hola</p>")}],))
+
+    def test_xmlrpc_safe_flattens_markup_recursively(self):
+        safe = client_mod._xmlrpc_safe(
+            {
+                "description": Markup("<p>Sin conexión & sin luz</p>"),
+                "nested": [Markup("<b>x</b>"), {"name": Markup("Juan")}],
+            }
+        )
+        self.assertIs(type(safe["description"]), str)
+        self.assertEqual(safe["description"], "<p>Sin conexión & sin luz</p>")
+        self.assertIs(type(safe["nested"][0]), str)
+        self.assertIs(type(safe["nested"][1]["name"]), str)
+        # Lo que antes reventaba ahora se serializa sin abrir conexión.
+        xmlrpc.client.dumps(([safe],))
+
+    def test_execute_sanitizes_markup_before_marshalling(self):
+        """El client aplica _xmlrpc_safe a args/kwargs antes de execute_kw."""
+        proxy = mock.MagicMock()
+        proxy.authenticate.return_value = 7
+        proxy.execute_kw.return_value = 55
+        config = {
+            "url": "https://remote.example.com",
+            "db": "remote_db",
+            "user": "sync@example.com",
+            "key": "secret-key",
+            "timeout": 15,
+        }
+        vals = {"description": Markup("<p>hola</p>"), "name": "Corte"}
+        with mock.patch.object(client_mod, "_server_proxy", return_value=proxy):
+            client = client_mod.RemoteOdoo(config)
+            result = client.execute(
+                "helpdesk.ticket",
+                "create",
+                [vals],
+                {"context": {"todd_helpdesk_sync_skip": True}},
+            )
+
+        self.assertEqual(result, 55)
+        sent_args, sent_kwargs = proxy.execute_kw.call_args.args[5:7]
+        self.assertIs(type(sent_args[0]["description"]), str)
+        self.assertIs(type(sent_kwargs["context"]["todd_helpdesk_sync_skip"]), bool)
+        # Prueba de fuego: el payload enviado es serializable por XML-RPC.
+        xmlrpc.client.dumps((sent_args, sent_kwargs))

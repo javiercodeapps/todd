@@ -76,6 +76,32 @@ def check_config(config):
         )
 
 
+def _xmlrpc_safe(value):
+    """Aplana valores a tipos que ``xmlrpc.client`` sabe serializar.
+
+    ``xmlrpc.client`` elige el serializador por tipo *exacto* (``type(value)``),
+    no por ``isinstance``. Cualquier subclase de ``str`` queda fuera del
+    despacho y provoca::
+
+        TypeError: cannot marshal <class 'markupsafe.Markup'> objects
+
+    En Odoo 17+ los campos ``Html`` (p. ej. ``helpdesk.ticket.description``)
+    devuelven ``markupsafe.Markup`` al leerlos, que es justamente una subclase
+    de ``str``. Antes de enviar, se convierten recursivamente a ``str`` nativo
+    (sin perder contenido) para que el payload viaje por XML-RPC sin importar
+    de qué campo de Odoo provenga.
+    """
+    if isinstance(value, str):
+        # Cubre str y todas sus subclases (Markup, ...). str() de un str puro
+        # devuelve el mismo objeto; de una subclase devuelve un str nativo.
+        return str(value)
+    if isinstance(value, dict):
+        return {_xmlrpc_safe(k): _xmlrpc_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_xmlrpc_safe(v) for v in value]
+    return value
+
+
 class RemoteOdoo:
     """Conexión autenticada contra otro Odoo a través de /xmlrpc/2/."""
 
@@ -101,7 +127,7 @@ class RemoteOdoo:
         )
 
     def execute(self, model, method, args, kwargs=None):
-        """Llama a ``execute_kw`` y normaliza cualquier fallo de red/servidor."""
+        """Llama a ``execute_kw`` (aplanando valores) y envuelve cualquier fallo."""
         try:
             return self.proxy.execute_kw(
                 self.config["db"],
@@ -109,8 +135,8 @@ class RemoteOdoo:
                 self.config["key"],
                 model,
                 method,
-                args,
-                kwargs or {},
+                _xmlrpc_safe(args),
+                _xmlrpc_safe(kwargs or {}),
             )
         except Exception as err:
             raise ToddSyncRemoteError(
