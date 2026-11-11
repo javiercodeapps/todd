@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_todd_sync" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.todd.sync</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="helpdesk_mgmt.res_config_settings_view_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//app[@name='helpdesk_mgmt']" position="inside">
+                <block
+                    title="Réplica a otro servidor Odoo (XML-RPC)"
+                    name="todd_helpdesk_sync"
+                >
+                    <setting
+                        string="Habilitar réplica"
+                        help="Al crear un ticket se encola un job que lo copia al Odoo remoto."
+                    >
+                        <field name="todd_helpdesk_sync_enabled" />
+                    </setting>
+                    <setting
+                        string="Servidor remoto"
+                        invisible="not todd_helpdesk_sync_enabled"
+                    >
+                        <div class="content-group">
+                            <div class="mt8">
+                                <field
+                                    name="todd_helpdesk_sync_remote_url"
+                                    placeholder="https://odoo.empresa.com"
+                                />
+                                <label
+                                    for="todd_helpdesk_sync_remote_url"
+                                    string="URL"
+                                />
+                            </div>
+                            <div class="mt8">
+                                <field name="todd_helpdesk_sync_remote_db" />
+                                <label
+                                    for="todd_helpdesk_sync_remote_db"
+                                    string="Base de datos"
+                                />
+                            </div>
+                            <div class="mt8">
+                                <field name="todd_helpdesk_sync_remote_user" />
+                                <label
+                                    for="todd_helpdesk_sync_remote_user"
+                                    string="Usuario"
+                                />
+                            </div>
+                            <div class="mt8">
+                                <field
+                                    name="todd_helpdesk_sync_remote_key"
+                                    password="True"
+                                />
+                                <label
+                                    for="todd_helpdesk_sync_remote_key"
+                                    string="API key / contraseña"
+                                />
+                            </div>
+                            <div class="mt8">
+                                <field name="todd_helpdesk_sync_timeout" />
+                                <label
+                                    for="todd_helpdesk_sync_timeout"
+                                    string="Timeout (s)"
+                                />
+                            </div>
+                            <div class="mt16">
+                                <button
+                                    name="action_todd_sync_test_connection"
+                                    type="object"
+                                    string="Probar conexión"
+                                    class="btn-secondary"
+                                />
+                            </div>
+                        </div>
+                    </setting>
+                </block>
+            </xpath>
+        </field>
+    </record>
+</odoo>

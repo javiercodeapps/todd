@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="ticket_view_form_todd_sync" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.view.form.todd.sync</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="inherit_id" ref="helpdesk_mgmt.ticket_view_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button
+                    name="action_todd_sync_retry"
+                    type="object"
+                    string="Reenviar al servidor"
+                    invisible="todd_sync_state == 'pending'"
+                    groups="helpdesk_mgmt.group_helpdesk_manager"
+                />
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page string="Réplica a servidor" name="todd_sync">
+                    <group name="todd_sync_state">
+                        <field name="todd_sync_state" widget="badge" />
+                        <field name="todd_sync_remote_id" />
+                        <field name="todd_sync_date" />
+                        <field name="todd_sync_attempts" />
+                        <field name="todd_sync_error" colspan="2" />
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>
