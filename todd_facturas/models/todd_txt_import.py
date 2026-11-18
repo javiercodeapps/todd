@@ -2,11 +2,20 @@ import os
 import logging
 from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
+from psycopg2 import errorcodes
 from odoo import models, fields, api
 
 _logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 5000
+
+# Mismos códigos que PG_CONCURRENCY_ERRORS_TO_RETRY de Odoo / queue_job.
+# Se evita importar odoo.service.model aquí porque arrastra odoo.http.
+PG_CONCURRENCIA_REINTENTABLE = (
+    errorcodes.SERIALIZATION_FAILURE,   # 40001
+    errorcodes.DEADLOCK_DETECTED,       # 40P01
+    errorcodes.LOCK_NOT_AVAILABLE,      # 55P03
+)
 
 
 class ToddTxtImport(models.Model):
@@ -355,6 +364,34 @@ class ToddTxtImport(models.Model):
             'log': self._append_log([msg]),
         })
 
+    def _marcar_error_aislado(self, msg):
+        """Marca el error usando una transacción propia.
+
+        Tras un error de PostgreSQL la transacción del job queda abortada
+        (25P02): self.write() y hasta leer self.log fallarían. Un cursor nuevo
+        puede escribir sin depender de ella. Es el mismo patrón que usa
+        queue_job en ``_runjob`` para reencolar un job.
+        """
+        try:
+            with self.env.registry.cursor() as cr:
+                # Si el job llegó a hacer el UPDATE de _sumar_progreso antes de
+                # fallar, su transacción aún retiene el bloqueo de la fila hasta
+                # el rollback de queue_job. Limitar la espera evita un cuelgue.
+                cr.execute("SET LOCAL lock_timeout = '2s'")
+                cr.execute(
+                    """
+                    UPDATE todd_txt_import SET
+                        state = 'error',
+                        log = RIGHT(CONCAT_WS(E'\\n', NULLIF(log, ''), %s), 80000),
+                        write_date = (now() AT TIME ZONE 'UTC')
+                    WHERE id = %s
+                    """,
+                    (msg, self.id),
+                )
+        except Exception:
+            _logger.exception('TODD: no se pudo registrar el error del lote')
+        self.invalidate_recordset()
+
     def _sumar_progreso(self, lineas_lote, omitidas, creadas, actualizadas, partners_nuevos, servicios_nuevos, errores, log_lines, total):
         self.ensure_one()
         extra = '\n'.join(log_lines) if log_lines else ''
@@ -446,33 +483,91 @@ class ToddTxtImport(models.Model):
         )
         self.env.registry.clear_cache()
 
+        # Sólo se encola el PRIMER lote: cada lote encadena el siguiente al
+        # terminar. Así nunca hay dos jobs del mismo archivo vivos a la vez.
+        # Con Odoo 19 (REPEATABLE READ), N jobs actualizando la misma fila de
+        # todd_txt_import en _sumar_progreso provocan SerializationFailure
+        # (40001) en todos menos el primero que confirma.
         rangos = list(self._rangos_lote(total))
-        for start, end in rangos:
-            self.with_delay(
-                channel='root',
-                identity_key=f'todd.txt.import.{self.id}.{start}.{end}',
-                description=f'Todd {self.filename} líneas {start}-{end - 1}',
-            )._procesar_lote(start, end, total)
-        _logger.info('TODD: Encolados %s lotes para %s (%s líneas)', len(rangos), self.filename, total)
+        start, end = rangos[0]
+        self.with_delay(
+            channel='root',
+            identity_key=f'todd.txt.import.{self.id}.{start}.{end}',
+            description=f'Todd {self.filename} líneas {start}-{end - 1}',
+        )._procesar_lote(start, end, total)
+        _logger.info(
+            'TODD: Encolado lote 1/%s para %s (%s líneas). '
+            'Los restantes se encadenan al terminar cada lote.',
+            len(rangos), self.filename, total,
+        )
         return True
+
+    @staticmethod
+    def _siguiente_rango(end, total):
+        """Rango que sigue a ``(start, end)``, o None si era el último."""
+        file_len = total + 1
+        if end >= file_len:
+            return None
+        start = end
+        return start, min(start + BATCH_SIZE, file_len)
+
+    def _encolar_siguiente_lote(self, end, total, filename):
+        """Encadena el lote siguiente DENTRO de la transacción del lote actual.
+
+        El INSERT del job hijo va en el mismo commit: si este lote falla, el
+        rollback se lo lleva y el reintento de queue_job no duplica la cadena.
+        Al haber un único job vivo por archivo desaparece la contención sobre
+        la fila de todd_txt_import y, de paso, el log deja de pisarse (cada
+        lote arranca con un snapshot posterior al commit del anterior).
+        """
+        siguiente = self._siguiente_rango(end, total)
+        if not siguiente:
+            _logger.info('TODD: último lote de %s completado', filename)
+            return
+        start, fin = siguiente
+        self.with_delay(
+            channel='root',
+            identity_key=f'todd.txt.import.{self.id}.{start}.{fin}',
+            description=f'Todd {filename} líneas {start}-{fin - 1}',
+        )._procesar_lote(start, fin, total)
 
     def _procesar_lote(self, start, end, total):
         self.ensure_one()
-        _logger.info('TODD: Lote %s líneas %s-%s/%s', self.filename, start, end - 1, total)
+        # Precargar los campos ANTES del try. Si la transacción se aborta (p.ej.
+        # un SerializationFailure en _sumar_progreso), leer self.<campo> aquí
+        # dentro fuerza un SELECT sobre un cursor muerto y lanza
+        # InFailedSqlTransaction (25P02), que enmascara el error original.
+        filename = self.filename
+        _logger.info('TODD: Lote %s líneas %s-%s/%s', filename, start, end - 1, total)
         try:
             self._procesar_lote_body(start, end, total)
-        except Exception as e:
-            _logger.exception('TODD: falla lote %s-%s de %s', start, end - 1, self.filename)
-            self._marcar_error(f'ERROR lote {start}-{end - 1}: {e}')
+            self._encolar_siguiente_lote(end, total, filename)
+        except Exception as exc:
+            # Nada de ORM del job en este bloque: la transacción puede estar
+            # abortada. Re-lanzar limpio permite que queue_job vea el pgcode
+            # original y reintente los errores de concurrencia (40001).
+            _logger.exception('TODD: falla lote %s-%s de %s', start, end - 1, filename)
+            # Los errores reintentables NO deben marcar 'error': el cron
+            # relanzaría la cadena mientras ésta sigue viva. Los demás sí, para
+            # que la importación no quede pegada en 'processing' y se pueda
+            # reprocesar (el chain se detiene si un lote falla definitivamente).
+            if getattr(exc, 'pgcode', None) not in PG_CONCURRENCIA_REINTENTABLE:
+                self._marcar_error_aislado(
+                    f'ERROR lote {start}-{end - 1}: {exc}'
+                )
             raise
 
     def _procesar_lote_body(self, start, end, total):
+        filepath = self.filepath
         try:
-            with open(self.filepath, 'r', encoding='latin-1') as f:
+            with open(filepath, 'r', encoding='latin-1') as f:
                 lineas = f.readlines()
-        except Exception as e:
-            self._marcar_error(f'Error leyendo archivo: {e}')
-            return
+        except Exception:
+            # Antes esto hacía _marcar_error() y un return: el job se marcaba
+            # como DONE sin procesar nada y, con el encadenado, la cadena
+            # seguía avanzando en falso. Propagar para que falle de verdad.
+            _logger.exception('TODD: no se pudo leer %s', filepath)
+            raise
 
         end = min(end, len(lineas))
         source_dir = self._get_pdf_dir()
