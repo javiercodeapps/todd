@@ -36,7 +36,31 @@
                             <field name="codigo_estado"/>
                         </group>
                     </group>
+                    <group string="Último cambio de estado" invisible="not fecha_ultimo_cambio_estado">
+                        <field name="fecha_ultimo_cambio_estado" readonly="1"/>
+                        <field name="ultimo_txt_estado" readonly="1"/>
+                        <field name="ultimo_sentido_estado" readonly="1"/>
+                        <field name="estado_historial_count" readonly="1"/>
+                    </group>
+                    <notebook>
+                        <page string="Historial de estado" name="estado_historial">
+                            <field name="estado_historial_ids" nolabel="1" readonly="1">
+                                <list>
+                                    <field name="fecha"/>
+                                    <field name="estado_anterior"/>
+                                    <field name="estado_nuevo"/>
+                                    <field name="sentido"/>
+                                    <field name="origen"/>
+                                    <field name="txt_nombre"/>
+                                    <field name="linea_txt"/>
+                                    <field name="estado_comp"/>
+                                    <field name="user_id"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
                 </sheet>
+                <chatter/>
             </form>
         </field>
     </record>
@@ -55,6 +79,9 @@
                 <field name="importe"/>
                 <field name="servicio"/>
                 <field name="estado_pago"/>
+                <field name="ultimo_txt_estado" optional="hide"/>
+                <field name="ultimo_sentido_estado" optional="hide"/>
+                <field name="fecha_ultimo_cambio_estado" optional="hide"/>
                 <field name="pdf_disponible"/>
             </list>
         </field>
@@ -64,5 +91,52 @@
         <field name="name">Facturas Todd</field>
         <field name="res_model">todd.factura</field>
         <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Historial global: permite filtrar/agrupar cambios y encontrar
+         rápidamente las reversiones Pagado -> Adeudado y su TXT de origen. -->
+    <record id="view_todd_factura_estado_historial_list" model="ir.ui.view">
+        <field name="name">todd.factura.estado.historial.list</field>
+        <field name="model">todd.factura.estado.historial</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="fecha"/>
+                <field name="factura_id"/>
+                <field name="estado_anterior"/>
+                <field name="estado_nuevo"/>
+                <field name="sentido"/>
+                <field name="origen"/>
+                <field name="txt_nombre"/>
+                <field name="linea_txt"/>
+                <field name="estado_comp"/>
+                <field name="user_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_todd_factura_estado_historial_search" model="ir.ui.view">
+        <field name="name">todd.factura.estado.historial.search</field>
+        <field name="model">todd.factura.estado.historial</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="txt_nombre"/>
+                <field name="factura_id"/>
+                <field name="linea_txt"/>
+                <filter string="Reversiones" name="reversiones" domain="[('sentido', '=', 'reversion')]"/>
+                <filter string="Adeudado a Pagado" name="pagos" domain="[('sentido', '=', 'pago')]"/>
+                <filter string="Desde TXT" name="desde_txt" domain="[('origen', '=', 'txt')]"/>
+                <group>
+                    <filter string="Archivo TXT" name="group_txt" context="{'group_by': 'txt_nombre'}"/>
+                    <filter string="Sentido" name="group_sentido" context="{'group_by': 'sentido'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_todd_factura_estado_historial" model="ir.actions.act_window">
+        <field name="name">Historial de estados</field>
+        <field name="res_model">todd.factura.estado.historial</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_todd_factura_estado_historial_search"/>
     </record>
 </odoo>

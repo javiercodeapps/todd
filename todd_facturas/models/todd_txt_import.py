@@ -284,27 +284,126 @@ class ToddTxtImport(models.Model):
         return src if src and os.path.exists(src) else ''
 
     @api.model
-    def _crear_o_actualizar_factura(self, lp, source_dir):
+    def _dominio_factura(self, lp, estricto=True):
+        """Dominio para localizar la factura correspondiente a una línea de TXT.
+
+        ``numero_completo`` NO es único. Verificado con los TXT reales: el
+        volcado histórico tiene 95.360 claves (punto_venta, nro_factura)
+        repetidas entre clientes, servicios y períodos, y 897 de esas claves
+        chocan con facturas vigentes. Por eso la clave siempre incluye el
+        partner y, en el dominio estricto, período y servicio.
+
+        El dominio laxo (número + partner + fecha de emisión) existe sólo para
+        tolerar una corrección de período/servicio en un TXT posterior. Nunca
+        se busca por ``numero_completo`` aislado.
+        """
         numero = f"{lp['pto_venta']:04d}-{lp['nro_fac']:08d}"
-        existe = self.env['todd.factura'].search([
+        domain = [
             ('numero_completo', '=', numero),
-        ], limit=1)
-        nuevo_estado = 'pagado' if 'Pagado' in lp['estado_comp'] else 'adeudado'
+            ('partner_id', '=', lp['partner_id']),
+        ]
+        if estricto:
+            domain += [
+                ('periodo', '=', lp['periodo']),
+                ('servicio', '=', lp['servicio']),
+            ]
+        else:
+            domain.append(('fecha_emision', '=', lp['fecha_fac']))
+        return domain
+
+    @api.model
+    def _buscar_factura_para_linea(self, lp):
+        """Devuelve ``(estado, facturas, estricto)``.
+
+        ``estado`` es 'unico', 'ambiguo' o 'ninguno'. Si hay más de una
+        coincidencia se devuelve 'ambiguo' en vez de elegir una con
+        ``limit=1``: antes eso terminaba pisando la factura equivocada.
+        """
+        Factura = self.env['todd.factura']
+        candidatas = Factura.search(self._dominio_factura(lp))
+        if len(candidatas) == 1:
+            return 'unico', candidatas, True
+        if len(candidatas) > 1:
+            return 'ambiguo', candidatas, True
+        candidatas = Factura.search(self._dominio_factura(lp, estricto=False))
+        if len(candidatas) == 1:
+            return 'unico', candidatas, False
+        if len(candidatas) > 1:
+            return 'ambiguo', candidatas, False
+        return 'ninguno', Factura, True
+
+    @api.model
+    def _normalizar_estado_comp(self, valor):
+        """Mapa explícito del estado del comprobante; sin ``in``.
+
+        ``'Pagado' in 'No Pagado'`` daba True. Un valor desconocido devuelve
+        ``None`` para NO tocar el estado (antes se asumía 'adeudado' y podía
+        desmarcar un pago real).
+        """
+        v = (valor or '').strip().casefold()
+        if v in ('pagado', 'pagada', 'pago', 'abonado', 'cobrado'):
+            return 'pagado'
+        if v in ('adeudado', 'adeudada', 'impago', 'impaga', 'pendiente',
+                 'no pagado', 'sin pagar', ''):
+            return 'adeudado'
+        return None
+
+    def _crear_o_actualizar_factura(self, lp, source_dir, txt_nombre=None,
+                                    txt_import_id=None):
+        """Crea o actualiza la factura de una línea de TXT.
+
+        ``txt_nombre`` / ``txt_import_id`` identifican el origen del dato para
+        que ``cambiar_estado_pago`` deje el cambio auditado en el chatter y en
+        ``todd.factura.estado.historial``.
+        """
+        numero = f"{lp['pto_venta']:04d}-{lp['nro_fac']:08d}"
+        Factura = self.env['todd.factura']
+        estado_busqueda, existe, estricto = self._buscar_factura_para_linea(lp)
+        if estado_busqueda == 'ambiguo':
+            _logger.warning(
+                'TODD: %s coincide con %s facturas (partner %s, periodo %s, '
+                'servicio %s); línea %s omitida para no pisar la equivocada',
+                numero, len(existe), lp['partner_id'], lp['periodo'],
+                lp['servicio'], lp.get('line_num'),
+            )
+            return 'ambiguo'
+
+        nuevo_estado = self._normalizar_estado_comp(lp['estado_comp'])
         pdf_ruta = self._pdf_ruta(source_dir, lp['archivo_pdf'])
 
         if existe:
             vals = {}
-            if existe.estado_pago != nuevo_estado:
-                vals['estado_pago'] = nuevo_estado
             if pdf_ruta and existe.archivo_pdf_ruta != pdf_ruta:
                 vals['archivo_pdf'] = lp['archivo_pdf']
                 vals['archivo_pdf_ruta'] = pdf_ruta
-            if lp.get('servicio_id') and existe.servicio_id.id != lp['servicio_id']:
+            if existe.codigo_estado != lp['estado_comp']:
+                vals['codigo_estado'] = lp['estado_comp']
+            # Sólo se reasigna el servicio cuando la coincidencia es estricta:
+            # con el dominio laxo podría ser otra factura con datos corregidos.
+            if estricto and lp.get('servicio_id') and \
+                    existe.servicio_id.id != lp['servicio_id']:
                 vals['servicio_id'] = lp['servicio_id']
             if vals:
                 existe.write(vals)
-                return 'updated'
-            return 'skipped'
+
+            cambio = False
+            if nuevo_estado:
+                cambio = existe.cambiar_estado_pago(
+                    nuevo_estado,
+                    origen='txt',
+                    txt_nombre=txt_nombre,
+                    txt_import_id=txt_import_id,
+                    linea_txt=lp.get('line_num'),
+                    estado_comp=lp['estado_comp'],
+                )
+            else:
+                _logger.warning(
+                    'TODD: estado_comp desconocido %r en %s línea %s; '
+                    'el estado de %s no se modifica',
+                    lp['estado_comp'], txt_nombre or '(TXT sin nombre)',
+                    lp.get('line_num'), numero,
+                )
+            return 'updated' if (cambio or vals) else 'skipped'
 
         limite = date.today() - relativedelta(years=1)
         if lp['fecha_fac'] and lp['fecha_fac'] < limite:
@@ -322,7 +421,7 @@ class ToddTxtImport(models.Model):
 
         try:
             with self.env.cr.savepoint():
-                self.env['todd.factura'].create({
+                Factura.create({
                     'partner_id': lp['partner_id'],
                     'servicio_id': lp.get('servicio_id'),
                     'periodo': lp['periodo'],
@@ -334,7 +433,8 @@ class ToddTxtImport(models.Model):
                     'archivo_pdf': lp['archivo_pdf'],
                     'cod_pago_electronico': lp['cod_pago_electronico'],
                     'cod_pago_electronico_otros': lp['cod_pago_electronico_otros'],
-                    'estado_pago': nuevo_estado,
+                    'estado_pago': nuevo_estado or 'adeudado',
+                    'codigo_estado': lp['estado_comp'],
                     'domicilio': lp['domicilio'],
                     'servicio': lp['servicio'],
                     'importe_2do_vencimiento': lp['importe_2do_venc'],
@@ -343,10 +443,10 @@ class ToddTxtImport(models.Model):
                 })
             return 'created'
         except Exception:
-            existe = self.env['todd.factura'].search([
-                ('numero_completo', '=', numero),
-            ], limit=1)
-            if not existe:
+            # Otro lote pudo insertar la misma factura entre la búsqueda y el
+            # INSERT. Se reutiliza la clave compuesta, nunca el número aislado.
+            estado_busqueda, _, _ = self._buscar_factura_para_linea(lp)
+            if estado_busqueda == 'ninguno':
                 raise
             return 'skipped'
 
@@ -626,14 +726,26 @@ class ToddTxtImport(models.Model):
                 log.append(f'Línea {i + 1}: ERROR parseo - {e}')
                 _logger.exception('TODD: parseo línea %s de %s', i + 1, self.filename)
 
+        txt_nombre = self.filename
+        txt_import_id = self.id
         for lp in lineas_parseadas:
             try:
                 with self.env.cr.savepoint():
-                    status = self._crear_o_actualizar_factura(lp, source_dir)
+                    status = self._crear_o_actualizar_factura(
+                        lp, source_dir,
+                        txt_nombre=txt_nombre,
+                        txt_import_id=txt_import_id,
+                    )
                 if status == 'created':
                     creadas += 1
                 elif status == 'updated':
                     actualizadas += 1
+                elif status == 'ambiguo':
+                    omitidas += 1
+                    log.append(
+                        f"Línea {lp['line_num']}: AMBIGUA, número repetido con "
+                        "la misma clave; omitida para no pisar otra factura"
+                    )
             except Exception as e:
                 errores += 1
                 log.append(f"Línea {lp['line_num']}: ERROR factura - {e}")

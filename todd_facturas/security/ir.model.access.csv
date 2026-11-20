@@ -6,3 +6,5 @@ access_todd_servicio_manager,todd.servicio.manager,model_todd_servicio,base.grou
 access_todd_import_user,todd.import.wizard.user,model_todd_import_wizard,base.group_user,1,1,1,1
 access_todd_txt_import_user,todd.txt.import.user,model_todd_txt_import,base.group_user,1,1,1,1
 access_todd_txt_import_manager,todd.txt.import.manager,model_todd_txt_import,base.group_system,1,1,1,1
+access_todd_factura_estado_historial_user,todd.factura.estado.historial.user,model_todd_factura_estado_historial,base.group_user,1,0,0,0
+access_todd_factura_estado_historial_manager,todd.factura.estado.historial.manager,model_todd_factura_estado_historial,base.group_system,1,1,1,1

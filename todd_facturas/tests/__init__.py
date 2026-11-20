@@ -4,3 +4,4 @@ from . import test_portal_security
 from . import test_provincianet_vencido
 from . import test_todd_txt_import_partner
 from . import test_todd_txt_import_encadenado
+from . import test_todd_txt_import_estado

@@ -4,10 +4,22 @@ import os
 from datetime import date, datetime
 
 import requests
+from markupsafe import Markup, escape
 
 from odoo import models, fields, api
 
 _logger = logging.getLogger(__name__)
+
+ESTADOS_PAGO = [('pagado', 'Pagado'), ('adeudado', 'Adeudado')]
+SENTIDOS_CAMBIO = [
+    ('pago', 'Adeudado → Pagado'),
+    ('reversion', 'Pagado → Adeudado'),
+]
+ORIGENES_CAMBIO = [
+    ('txt', 'Importación TXT'),
+    ('manual', 'Acción manual'),
+    ('otro', 'Otro'),
+]
 
 PROVINCIANET_URL = 'https://service-payment.provincianet.com.ar/api/v1/service/preorder'
 SERVICIOS = {
@@ -60,6 +72,7 @@ def decodificar_codigo_pago(barcode):
 
 class ToddFactura(models.Model):
     _name = 'todd.factura'
+    _inherit = ['mail.thread']
     _description = 'Factura Todd'
     _order = 'fecha_emision desc, id desc'
 
@@ -75,9 +88,25 @@ class ToddFactura(models.Model):
     archivo_pdf = fields.Char(string='Archivo PDF')
     cod_pago_electronico = fields.Char(string='Cód. Pago Electrónico')
     cod_pago_electronico_otros = fields.Char(string='Cód. Pago Electrónico Otros')
-    estado_pago = fields.Selection([
-        ('pagado', 'Pagado'), ('adeudado', 'Adeudado'),
-    ], string='Estado', default='adeudado', index=True)
+    estado_pago = fields.Selection(
+        ESTADOS_PAGO, string='Estado', default='adeudado', index=True,
+    )
+    estado_historial_ids = fields.One2many(
+        'todd.factura.estado.historial', 'factura_id',
+        string='Historial de estado', readonly=True,
+    )
+    estado_historial_count = fields.Integer(
+        string='Cambios de estado', compute='_compute_estado_historial_count',
+    )
+    fecha_ultimo_cambio_estado = fields.Datetime(
+        string='Último cambio de estado', readonly=True, index=True,
+    )
+    ultimo_txt_estado = fields.Char(
+        string='Último TXT que cambió el estado', readonly=True, index=True,
+    )
+    ultimo_sentido_estado = fields.Selection(
+        SENTIDOS_CAMBIO, string='Último sentido', readonly=True, index=True,
+    )
     domicilio = fields.Char(string='Domicilio')
     servicio = fields.Selection([
         ('E', 'Energía'), ('A', 'Agua'), ('T', 'Telefonía'),
@@ -99,9 +128,96 @@ class ToddFactura(models.Model):
         for r in self:
             r.pdf_disponible = bool(r.archivo_pdf_ruta and os.path.exists(r.archivo_pdf_ruta))
 
+    @api.depends('estado_historial_ids')
+    def _compute_estado_historial_count(self):
+        for rec in self:
+            rec.estado_historial_count = len(rec.estado_historial_ids)
+
+    def cambiar_estado_pago(self, nuevo_estado, origen='manual', txt_nombre=None,
+                            txt_import_id=None, linea_txt=None, estado_comp=None,
+                            nota=None):
+        """Aplica un cambio de ``estado_pago`` dejando auditoría completa.
+
+        Se aceptan ambos sentidos: ``adeudado -> pagado`` es el flujo normal y
+        ``pagado -> adeudado`` se registra como ``reversion`` (puede pasar por
+        un contraasiento o una corrección del sistema de origen), de modo que
+        se distinga fácilmente del resto. Devuelve ``True`` sólo si hubo un
+        cambio real: cuando el estado ya coincide no se genera ni historial ni
+        mensaje en el chatter.
+        """
+        self.ensure_one()
+        if nuevo_estado not in ('pagado', 'adeudado'):
+            return False
+        anterior = self.estado_pago
+        if anterior == nuevo_estado:
+            return False
+
+        sentido = 'pago' if nuevo_estado == 'pagado' else 'reversion'
+        ahora = fields.Datetime.now()
+        nombre_txt = txt_nombre or ''
+        origen = origen if origen in dict(ORIGENES_CAMBIO) else 'otro'
+
+        registro = self.sudo()
+        registro.write({
+            'estado_pago': nuevo_estado,
+            'fecha_ultimo_cambio_estado': ahora,
+            'ultimo_txt_estado': nombre_txt or False,
+            'ultimo_sentido_estado': sentido,
+        })
+        registro.env['todd.factura.estado.historial'].create({
+            'factura_id': registro.id,
+            'fecha': ahora,
+            'estado_anterior': anterior,
+            'estado_nuevo': nuevo_estado,
+            'sentido': sentido,
+            'origen': origen,
+            'txt_nombre': nombre_txt or False,
+            'txt_import_id': txt_import_id or False,
+            'linea_txt': linea_txt or False,
+            'estado_comp': estado_comp or False,
+            'nota': nota or False,
+        })
+        # Crear el historial en un env sudo deja el One2many cacheado en orden
+        # de inserción. Invalidarlo aplica el _order (más nuevo primero) también
+        # para las lecturas dentro de la misma transacción (importaciones).
+        self.invalidate_recordset(['estado_historial_ids'])
+
+        etiquetas = dict(ESTADOS_PAGO)
+        lineas = [
+            '<b>Cambio de estado de pago</b>: %s → %s' % (
+                escape(etiquetas.get(anterior, anterior or '—')),
+                escape(etiquetas.get(nuevo_estado, nuevo_estado)),
+            ),
+            'Origen: %s' % escape(dict(ORIGENES_CAMBIO).get(origen, origen)),
+        ]
+        if nombre_txt:
+            lineas.append('Archivo TXT: <b>%s</b>' % escape(nombre_txt))
+        if txt_import_id:
+            lineas.append('Importación: #%s' % escape(str(txt_import_id)))
+        if linea_txt:
+            lineas.append('Línea del TXT: %s' % escape(str(linea_txt)))
+        if estado_comp:
+            lineas.append('Valor informado por el TXT: "%s"' % escape(estado_comp))
+        if sentido == 'reversion':
+            lineas.append(
+                '<b>Atención:</b> reversión Pagado → Adeudado '
+                '(caso excepcional, revisar el origen del dato)'
+            )
+        if nota:
+            lineas.append('Nota: %s' % escape(nota))
+        # mt_note: es un registro interno, no dispara correo a los seguidores.
+        registro.message_post(
+            body=Markup('<br/>'.join(lineas)),
+            subtype_xmlid='mail.mt_note',
+            message_type='notification',
+        )
+        return True
+
     def action_registrar_pago(self):
-        for r in self:
-            r.estado_pago = 'pagado'
+        for rec in self:
+            rec.cambiar_estado_pago(
+                'pagado', origen='manual', nota='Registro manual de pago',
+            )
         return True
 
     def provincianet_vencimiento(self):

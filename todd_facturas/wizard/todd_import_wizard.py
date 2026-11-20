@@ -32,6 +32,7 @@ class ToddImportWizard(models.TransientModel):
 
         importer = self.env['todd.txt.import']
         source_dir = importer._get_pdf_dir()
+        txt_nombre = self.archivo_nombre or 'TXT cargado manualmente'
         log = []
         total = ok = actualizadas = errores = omitidas = 0
         partners_map = {}
@@ -72,11 +73,19 @@ class ToddImportWizard(models.TransientModel):
                 parsed['partner_id'] = partner_id
                 parsed['servicio_id'] = servicios_map[svc_key]
                 with self.env.cr.savepoint():
-                    status = importer._crear_o_actualizar_factura(parsed, source_dir)
+                    status = importer._crear_o_actualizar_factura(
+                        parsed, source_dir, txt_nombre=txt_nombre,
+                    )
                 if status == 'created':
                     ok += 1
                 elif status == 'updated':
                     actualizadas += 1
+                elif status == 'ambiguo':
+                    omitidas += 1
+                    log.append(
+                        f'Línea {i}: AMBIGUA, número repetido con la misma '
+                        'clave; omitida para no pisar otra factura'
+                    )
             except Exception as e:
                 errores += 1
                 log.append(f'Línea {i}: ERROR - {e}')
